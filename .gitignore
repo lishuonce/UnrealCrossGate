@@ -75,6 +75,10 @@ DerivedDataCache/*
 
 # Original Assets of CrossGate
 CGRaw/*
+*.bin
+*.cgp
+*.dat
+*.dat1
 
 # cache files made by OS
-*.DS_Store
+.DS_Store
