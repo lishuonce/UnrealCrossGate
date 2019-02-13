@@ -74,11 +74,8 @@ Plugins/*/Intermediate/*
 DerivedDataCache/*
 
 # Original Assets of CrossGate
-CGRaw/*
-*.bin
-*.cgp
-*.dat
-*.dat1
+Content/CGRaw
 
-# cache files made by OS
-*/.DS_Store
+# gitignore_global
+# add to the .gitignore_global
+# git config --global core.excludesfile ~/.gitignore_global
