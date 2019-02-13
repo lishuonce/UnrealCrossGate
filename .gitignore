@@ -72,3 +72,9 @@ Plugins/*/Intermediate/*
 
 # Cache files for the editor to use
 DerivedDataCache/*
+
+# Original Assets of CrossGate
+CGRaw/*
+
+# cache files made by OS
+*.DS_Store
