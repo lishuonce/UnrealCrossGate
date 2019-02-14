@@ -12,8 +12,6 @@ public class UnrealCrossGate : ModuleRules
 
 		PrivateDependencyModuleNames.AddRange(new string[] {  });
         
-        AddEngineThirdPartyPrivateStaticDependencies(Target, "zlib");
-
 		// Uncomment if you are using Slate UI
 		// PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore" });
 		

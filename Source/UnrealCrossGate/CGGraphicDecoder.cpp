@@ -1,15 +1,12 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "CGGraphicDecoder.h"
-#include "Misc/Paths.h"
-#include "HAL/PlatformFilemanager.h"
-#include "GenericPlatform/GenericPlatformFile.h"
-#include "Serialization/ArchiveSaveCompressedProxy.h"
+#include "Runtime/Core/Public/HAL/PlatformFilemanager.h"
 
-CGGraphicDecoder & CGGraphicDecoder::GetSingletonObject()
+CGGraphicDecoder & CGGraphicDecoder::Get()
 {
-	static CGGraphicDecoder CGGraphDecoderSingletObj;
-	return CGGraphDecoderSingletObj;
+	static CGGraphicDecoder Singleton;
+	return Singleton;
 }
 
 CGGraphicDecoder::CGGraphicDecoder()
@@ -34,49 +31,51 @@ CGGraphicDecoder::~CGGraphicDecoder()
 
 uint8 * CGGraphicDecoder::GetDecodePngData(uint32 GraphicId, uint8 PaletId)
 {
-	UE_LOG(LogTemp, Warning, TEXT("gId:%i"), sGraphicInfo[GraphicId].gId);
-	UE_LOG(LogTemp, Warning, TEXT("gAddr:%i"), sGraphicInfo[GraphicId].gAddr);
-	UE_LOG(LogTemp, Warning, TEXT("gLength:%i"), sGraphicInfo[GraphicId].gLength);
-	UE_LOG(LogTemp, Warning, TEXT("gOffsetX:%i"), sGraphicInfo[GraphicId].gOffsetX);
-	UE_LOG(LogTemp, Warning, TEXT("gOffsetY:%i"), sGraphicInfo[GraphicId].gOffsetY);
-	UE_LOG(LogTemp, Warning, TEXT("gWidth:%i"), sGraphicInfo[GraphicId].gWidth);
-	UE_LOG(LogTemp, Warning, TEXT("gHeight:%i"), sGraphicInfo[GraphicId].gHeight);
-	UE_LOG(LogTemp, Warning, TEXT("gEast:%i"), sGraphicInfo[GraphicId].gEast);
-	UE_LOG(LogTemp, Warning, TEXT("gSouth:%i"), sGraphicInfo[GraphicId].gSouth);
-	UE_LOG(LogTemp, Warning, TEXT("gIsFloor:%i"), sGraphicInfo[GraphicId].gIsFloor);
-	UE_LOG(LogTemp, Warning, TEXT("gMapId:%i"), sGraphicInfo[GraphicId].gMapId);
+	//DEBUG LOG - GraphicInfo
+    UE_LOG(LogTemp, Warning, TEXT("gId:%i"), SGInfo[GraphicId].gId);
+	UE_LOG(LogTemp, Warning, TEXT("gAddr:%i"), SGInfo[GraphicId].gAddr);
+	UE_LOG(LogTemp, Warning, TEXT("gLength:%i"), SGInfo[GraphicId].gLength);
+	UE_LOG(LogTemp, Warning, TEXT("gOffsetX:%i"), SGInfo[GraphicId].gOffsetX);
+	UE_LOG(LogTemp, Warning, TEXT("gOffsetY:%i"), SGInfo[GraphicId].gOffsetY);
+	UE_LOG(LogTemp, Warning, TEXT("gWidth:%i"), SGInfo[GraphicId].gWidth);
+	UE_LOG(LogTemp, Warning, TEXT("gHeight:%i"), SGInfo[GraphicId].gHeight);
+	UE_LOG(LogTemp, Warning, TEXT("gEast:%i"), SGInfo[GraphicId].gEast);
+	UE_LOG(LogTemp, Warning, TEXT("gSouth:%i"), SGInfo[GraphicId].gSouth);
+	UE_LOG(LogTemp, Warning, TEXT("gIsFloor:%i"), SGInfo[GraphicId].gIsFloor);
+	UE_LOG(LogTemp, Warning, TEXT("gMapId:%i"), SGInfo[GraphicId].gMapId);
 	
-	
-
+    //Load GraphicData
 	if (fileHandle)
 	{
-		GraphicData sGData;
-		fileHandle->Seek(sGraphicInfo[GraphicId].gAddr);
-		fileHandle->Read((uint8 *)&sGData, 16);
-		UE_LOG(LogTemp, Warning, TEXT("gRD:%c%c"), sGData.gRD[0], sGData.gRD[1]);
-		UE_LOG(LogTemp, Warning, TEXT("gIscompressed:%i"), sGData.gIscompressed);
-		UE_LOG(LogTemp, Warning, TEXT("gWidth:%i"), sGData.gWidth);
-		UE_LOG(LogTemp, Warning, TEXT("gHeight:%i"), sGData.gHeight);
-		UE_LOG(LogTemp, Warning, TEXT("gLength:%i"), sGData.gLength);
-
-		if (!BufferData)
-		{
-			delete[] BufferData;
-		}
+		GraphicData SGData;
+		fileHandle->Seek(SGInfo[GraphicId].gAddr);
+		fileHandle->Read((uint8 *)&SGData, 16);
+        
+        //DEBUG LOG - GraphicData
+		UE_LOG(LogTemp, Warning, TEXT("gRD:%c%c"), SGData.gRD[0], SGData.gRD[1]);
+		UE_LOG(LogTemp, Warning, TEXT("gIscompressed:%i"), SGData.gIscompressed);
+		UE_LOG(LogTemp, Warning, TEXT("gWidth:%i"), SGData.gWidth);
+		UE_LOG(LogTemp, Warning, TEXT("gHeight:%i"), SGData.gHeight);
+		UE_LOG(LogTemp, Warning, TEXT("gLength:%i"), SGData.gLength);
 		
-		BufferDataLenth = sGraphicInfo[GraphicId].gLength - 16;
-		BufferData = new uint8[BufferDataLenth];
-		fileHandle->Read(BufferData, BufferDataLenth);
+		uint32 GDataLength = SGInfo[GraphicId].gLength - 16;
+		SGData.gData = new uint8[GDataLength];
+		fileHandle->Read(SGData.gData, GDataLength);
 
-		UE_LOG(LogTemp, Warning, TEXT("*gData: %x %x %x"), BufferData[0], BufferData[1], BufferData[2]);
-
-        if (sGData.gIscompressed)
+        if (SGData.gIscompressed)
         {
-            BufferData = JSSRLEDecode(BufferData, BufferDataLenth);
-            BufferDataLenth = sGData.gWidth * sGData.gHeight;
+            //JSSRLEDecode
+            uint8 *BufferDecoded = JSSRLEDecode(SGData.gData, GDataLength, SGData.gWidth, SGData.gHeight);
+            delete[] SGData.gData;
+            SGData.gData = BufferDecoded;
+            BufferDecoded = nullptr;
+            GDataLength = SGData.gWidth * SGData.gHeight;
         }
         
-		return CreatePNG(BufferData, BufferDataLenth, sGraphicInfo[GraphicId].gWidth, sGraphicInfo[GraphicId].gHeight);
+        //PNGEncode
+        uint8 *PNGBuffer = PNGEncode(SGData.gData, GDataLength, SGData.gWidth, SGData.gHeight);
+        
+		return PNGBuffer;
 	}
 	return nullptr;
 }
@@ -115,8 +114,8 @@ void CGGraphicDecoder::LoadGraphicInfo()
 	{
 		uint32 iFileSize = fileHandleTmp->Size();
 		uint32 iRecordNum = iFileSize / 40;
-		sGraphicInfo = new GraphicInfo[iRecordNum];
-		fileHandleTmp->Read((uint8 *)sGraphicInfo, iFileSize);
+		SGInfo = new GraphicInfo[iRecordNum];
+		fileHandleTmp->Read((uint8 *)SGInfo, iFileSize);
 		delete fileHandleTmp;
 	}
 }
@@ -152,114 +151,140 @@ void CGGraphicDecoder::InitGraphicData()
 	fileHandle = platFormFile.OpenRead(*fsGraphicDataPath);
 }
 
-uint8 * CGGraphicDecoder::JSSRLEDecode(uint8 *Buffer, uint32 SizeOfBuffer)
+uint8 * CGGraphicDecoder::JSSRLEDecode(uint8 *Buffer, uint32 SizeOfBuffer, uint32 PicWidth, uint32 PicHeight)
 {
-	uint32 CurrentDecodePosition = 0;
-	TArray<uint8> BufferDecoded;
+	//RLEFlags for RLE Decode
     enum
     {
-        none,
-        read,
-        repeat_background,
-        repeat_transparent
-    }rLengthAction = none;
-
-	while (CurrentDecodePosition < SizeOfBuffer)
+        RLE_NONE,
+        RLE_READ,
+        RLE_REPEAT_BACKGROUND,
+        RLE_REPEAT_TRANSPARENT
+    }ERLEFlags = RLE_NONE;
+    
+    uint32 BufferDecodedCursor = 0;
+    uint32 BufferCursor = 0;
+    uint32 BufferDecodedLength = PicWidth * PicHeight;
+    uint8 *BufferDecoded = new uint8[BufferDecodedLength];
+    
+    while (BufferCursor < SizeOfBuffer)
 	{
-		uint8 High = Buffer[CurrentDecodePosition] >> 4;
-		uint8 Low = Buffer[CurrentDecodePosition] & 0x0f;
-		uint32 NextSize;
-		uint8 *RepeatArr;
+		uint8 High = Buffer[BufferCursor] >> 4;
+		uint8 Low = Buffer[BufferCursor] & 0x0f;
+		uint32 RLESize;
+		uint8 *RepeatBuffer;
         
 		switch (High)
 		{
 		case 0x0:
-			NextSize = Low;
-			rLengthAction = read;
+			RLESize = Low;
+			ERLEFlags = RLE_READ;
 			break;
 		case 0x1:
-			NextSize = Low * 0x100 + Buffer[CurrentDecodePosition + 1];
-			rLengthAction = read;
+			RLESize = Low * 0x100 + Buffer[BufferCursor + 1];
+			ERLEFlags = RLE_READ;
 			break;
 		case 0x2:
-			NextSize = Low * 0x10000 + Buffer[CurrentDecodePosition + 1] * 0x100 + Buffer[CurrentDecodePosition + 2];
-			rLengthAction = read;
+			RLESize = Low * 0x10000 + Buffer[BufferCursor + 1] * 0x100 + Buffer[BufferCursor + 2];
+			ERLEFlags = RLE_READ;
 			break;
 		case 0x8:
-			NextSize = Low;
-			rLengthAction = repeat_background;
+			RLESize = Low;
+			ERLEFlags = RLE_REPEAT_BACKGROUND;
 			break;
 		case 0x9:
-			NextSize = Low * 0x100 + Buffer[CurrentDecodePosition + 2];
-			rLengthAction = repeat_background;
+			RLESize = Low * 0x100 + Buffer[BufferCursor + 2];
+			ERLEFlags = RLE_REPEAT_BACKGROUND;
 			break;
 		case 0xa:
-			NextSize = Low * 0x10000 + Buffer[CurrentDecodePosition + 2] * 0x100 + Buffer[CurrentDecodePosition + 3];
-			rLengthAction = repeat_background;
+			RLESize = Low * 0x10000 + Buffer[BufferCursor + 2] * 0x100 + Buffer[BufferCursor + 3];
+			ERLEFlags = RLE_REPEAT_BACKGROUND;
 			break;
 		case 0xc:
-			NextSize = Low;
-			rLengthAction = repeat_transparent;
+			RLESize = Low;
+			ERLEFlags = RLE_REPEAT_TRANSPARENT;
 			break;
 		case 0xd:
-			NextSize = Low * 0x100 + Buffer[CurrentDecodePosition + 1];
-			rLengthAction = repeat_transparent;
+			RLESize = Low * 0x100 + Buffer[BufferCursor + 1];
+			ERLEFlags = RLE_REPEAT_TRANSPARENT;
 			break;
 		case 0xe:
-			NextSize = Low * 0x10000 + Buffer[CurrentDecodePosition + 1] * 0x100 + Buffer[CurrentDecodePosition + 2];
-			rLengthAction = repeat_transparent;
+			RLESize = Low * 0x10000 + Buffer[BufferCursor + 1] * 0x100 + Buffer[BufferCursor + 2];
+			ERLEFlags = RLE_REPEAT_TRANSPARENT;
 			break;
 		default:
-			UE_LOG(LogTemp, Error, TEXT("Default: %x"), Buffer[CurrentDecodePosition]);
+			UE_LOG(LogTemp, Error, TEXT("switch(High) Default: %x"), Buffer[BufferCursor]);
 			break;
-		}
+		}//while switch(High) END
 
-		switch (rLengthAction)
+		switch (ERLEFlags)
 		{
-		case read:
-			BufferDecoded.Append(&Buffer[CurrentDecodePosition + High + 1], NextSize);
-			CurrentDecodePosition += High + 1 + NextSize;
-			UE_LOG(LogTemp, Warning, TEXT("Read: %x"), Buffer[CurrentDecodePosition]);
+		case RLE_READ:
+            memcpy(&BufferDecoded[BufferDecodedCursor], &Buffer[BufferCursor + High + 1], RLESize);
+            BufferDecodedCursor += RLESize;
+			BufferCursor += High + 1 + RLESize;
+			UE_LOG(LogTemp, Warning, TEXT("RLE_READ: %d"), RLESize);
 			break;
-		case repeat_background:
-			RepeatArr = new uint8[NextSize];
-			memset(RepeatArr, Buffer[CurrentDecodePosition + 1], NextSize);
-            BufferDecoded.Append(RepeatArr, NextSize);
-			delete[] RepeatArr;
-			CurrentDecodePosition += (High % 4) + 2;
-			UE_LOG(LogTemp, Warning, TEXT("repeat_background: %x"), Buffer[CurrentDecodePosition]);
+		case RLE_REPEAT_BACKGROUND:
+			RepeatBuffer = new uint8[RLESize];
+			memset(RepeatBuffer, Buffer[BufferCursor + 1], RLESize);
+            memcpy(&BufferDecoded[BufferDecodedCursor], RepeatBuffer, RLESize);
+            BufferDecodedCursor += RLESize;
+			delete[] RepeatBuffer;
+			BufferCursor += (High % 4) + 2;
+			UE_LOG(LogTemp, Warning, TEXT("RLE_REPEAT_BACKGROUND: %d"), RLESize);
 			break;
-		case repeat_transparent:
-			RepeatArr = new uint8[NextSize];
-			//transparent color
-			memset(RepeatArr, 0x00, NextSize);
-            BufferDecoded.Append(RepeatArr, NextSize);
-			delete[] RepeatArr;
-			CurrentDecodePosition += (High % 4) + 1;
-			UE_LOG(LogTemp, Warning, TEXT("repeat_transparent: %x"), Buffer[CurrentDecodePosition]);
+		case RLE_REPEAT_TRANSPARENT:
+			RepeatBuffer = new uint8[RLESize];
+			memset(RepeatBuffer, 0x00, RLESize);//transparent color
+            memcpy(&BufferDecoded[BufferDecodedCursor], RepeatBuffer, RLESize);
+            BufferDecodedCursor += RLESize;
+			delete[] RepeatBuffer;
+			BufferCursor += (High % 4) + 1;
+			UE_LOG(LogTemp, Warning, TEXT("RLE_REPEAT_TRANSPARENT: %d"), RLESize);
 			break;
 		default:
+            UE_LOG(LogTemp, Error, TEXT("switch(ERLEFlags) Default: %x"), Buffer[BufferCursor]);
 			break;
-		}
-
-		//CurrentDecodePosition = SizeOfBuffer;
-	}
-    UE_LOG(LogTemp, Warning, TEXT("Decoded Data size : %d"), BufferDecoded.Num());
+		}//switch(ERLEFlags) END
+        
+        ERLEFlags = RLE_NONE;
+        
+	}//while CurrentDecodePosition < SizeOfBuffer END
+    UE_LOG(LogTemp, Warning, TEXT("Decoded Data size : %d"), BufferDecodedLength);
     
-	return BufferDecoded.GetData();
+    //PNG : Line header with 0 & row from down to up
+    uint8 *BufferDecoded2 = new uint8[BufferDecodedLength + PicHeight];
+    uint32 BufferDecodedCursor2;
+    uint32 Line2;
+    for (uint32 Line = 0; Line < PicHeight; Line += 1)
+    {
+        Line2 = PicHeight - 1 - Line;
+        BufferDecodedCursor = Line * PicWidth;
+        BufferDecodedCursor2 = Line2 * (PicWidth + 1);
+        BufferDecoded2[BufferDecodedCursor2] = 0x00;
+        memcpy(&BufferDecoded2[BufferDecodedCursor2 + 1], &BufferDecoded[BufferDecodedCursor], PicWidth);
+    }
+    delete[] BufferDecoded;
+    
+	return BufferDecoded2;
 }
 
-uint8 * CGGraphicDecoder::CreatePNG(uint8 *Buffer, uint32 SizeOfBuffer, uint32 PicWidth, uint32 PicHeight)
+uint8 * CGGraphicDecoder::PNGEncode(uint8 *Buffer, uint32 SizeOfBuffer, uint32 PicWidth, uint32 PicHeight)
 {
-    PNGBuffer.FlushCache();
-    PNGBuffer.Empty();
+    //PNG init : PNGLength , PNGBuffer
+    int32 CompressedLength = FCompression::CompressMemoryBound(COMPRESS_ZLIB, SizeOfBuffer);
+    uint32 PNGLength = 1105 + CompressedLength;
+    uint8 *PNGBuffer = new uint8[PNGLength];
+    uint32 PNGBufferCursor = 0;
     
-    //PNG_Title
+    //PNG_Header
     uint8 PNG_Title[] = {0x89,0x50,0x4E,0x47,0x0D,0x0A,0x1A,0x0A};
-    PNGBuffer.Serialize(PNG_Title, 8);
-    UE_LOG(LogTemp, Warning, TEXT("PNG_Title : %d"), PNGBuffer.Num());
+    memcpy(PNGBuffer, &PNG_Title, 8);
+    PNGBufferCursor += 8;
+    UE_LOG(LogTemp, Warning, TEXT("PNG_Title : %d"), PNGBufferCursor);
     
-    //PNG_IHDR
+    //Chunk_IHDR
     struct Chunk_IHDR
     {
         uint32 Width;
@@ -270,70 +295,69 @@ uint8 * CGGraphicDecoder::CreatePNG(uint8 *Buffer, uint32 SizeOfBuffer, uint32 P
         uint8 FilterMethod = 0;
         uint8 InterlaceMethod = 0;
     };
-    Chunk_IHDR sChunk_IHDR = {SwapInt32(PicWidth), SwapInt32(PicHeight), 8, 3, 0, 0, 0};
-    AddChunkToPNGBuffer(13, "IHDR", &sChunk_IHDR);
+    bool bIsLittleEndian = FGenericPlatformProperties::IsLittleEndian();
+    uint32 PicWidthBigendian = bIsLittleEndian ? htonl(PicWidth) : PicWidth;
+    uint32 PicHeightBigendian = bIsLittleEndian ? htonl(PicHeight) : PicHeight;
+    Chunk_IHDR sChunk_IHDR = {PicWidthBigendian, PicHeightBigendian, 8, 3, 0, 0, 0};
+    AppendChunk(PNGBuffer, PNGBufferCursor, 13, "IHDR", &sChunk_IHDR);
     
-    //PNG_PLTE
-    AddChunkToPNGBuffer(768, "PLTE", sPalet_00);
+    //Chunk_PLTE
+    AppendChunk(PNGBuffer, PNGBufferCursor, 768, "PLTE", sPalet_00);
     
-    //PNG_tRNS
+    //Chunk_tRNS
     PaletColor Chunk_tRNS[256] = {{0x00, 0x00, 0x00}};//set transparent color
     memset(Chunk_tRNS + 1, (0xff, 0xff, 0xff), 255);
-    AddChunkToPNGBuffer(256, "tRNS", Chunk_tRNS);
+    AppendChunk(PNGBuffer, PNGBufferCursor, 256, "tRNS", Chunk_tRNS);
     
-    //PNG_IDAT
-    FBufferArchive ToBinary;
-    ToBinary.Serialize(Buffer, SizeOfBuffer);
-    TArray<uint8> CompressedData;
-    FArchiveSaveCompressedProxy Compressor =
-    FArchiveSaveCompressedProxy(CompressedData, ECompressionFlags::COMPRESS_ZLIB);
-    Compressor << ToBinary;
-    Compressor.Flush();
-    Compressor.FlushCache();
-    ToBinary.FlushCache();
-    ToBinary.Empty();
-    ToBinary.Close();
-    uint8 *Chunk_IDAT = CompressedData.GetData();
-    UE_LOG(LogTemp, Warning, TEXT("CompressedData.Num() : %d"), CompressedData.Num());
-    AddChunkToPNGBuffer(CompressedData.Num(), "IDAT", CompressedData.GetData());
-    CompressedData.Empty();
+    //Chunk_IDAT
+    //int32 CompressedLength = FCompression::CompressMemoryBound(COMPRESS_ZLIB, SizeOfBuffer);
+    uint8 *CompressedBuffer = new uint8[CompressedLength];
+    FCompression::CompressMemory(COMPRESS_ZLIB, CompressedBuffer, CompressedLength, Buffer, SizeOfBuffer);
+    UE_LOG(LogTemp, Warning, TEXT("FCompression::CompressMemory CompressedLength: %d"), CompressedLength);
+    AppendChunk(PNGBuffer, PNGBufferCursor, CompressedLength, "IDAT", CompressedBuffer);
+    delete[] CompressedBuffer;
     
-    //PNG_IEND
-    AddChunkToPNGBuffer(0, "IEND", nullptr);
+    //Chunk_IEND
+    AppendChunk(PNGBuffer, PNGBufferCursor, 0, "IEND", nullptr);
     
+    //Save PNGBuffer to random file
     FString fsTmpPngPath = FPaths::CreateTempFilename(*fsResPath, TEXT("tmp"), TEXT(".png"));
     IPlatformFile &platFormFile = FPlatformFileManager::Get().GetPlatformFile();
     IFileHandle *fileHandleTmp = platFormFile.OpenWrite(*fsTmpPngPath);
     if (fileHandleTmp)
     {
-        fileHandleTmp->Write(PNGBuffer.GetData(), PNGBuffer.Num());
+        fileHandleTmp->Write(PNGBuffer, PNGBufferCursor);
         delete fileHandleTmp;
     }
     
-    return PNGBuffer.GetData();
+    return PNGBuffer;
 }
 
-void CGGraphicDecoder::AddChunkToPNGBuffer(uint32 Chunk_Length, FString Chunk_Type_Code, void *Chunk_Data)
+void CGGraphicDecoder::AppendChunk(uint8 *PNGBuffer, uint32 &PNGBufferCursor, uint32 ChunkLength, FString ChunkTypeCode, void *ChunkData)
 {
+    //ChunkLength
+    bool bIsLittleEndian = FGenericPlatformProperties::IsLittleEndian();
+    uint32 ChunkLengthBigendian = bIsLittleEndian ? htonl(ChunkLength) : ChunkLength;
+    memcpy(&PNGBuffer[PNGBufferCursor], &ChunkLengthBigendian, 4);
+    PNGBufferCursor += 4;
     
-    uint32 Chunk_Length_Swaped = SwapInt32(Chunk_Length);
-    PNGBuffer << Chunk_Length_Swaped;
-    PNGBuffer.Serialize((uint8 *)TCHAR_TO_ANSI(*Chunk_Type_Code), 4);
-    if (Chunk_Length > 0)
+    //ChunkTypeCode
+    memcpy(&PNGBuffer[PNGBufferCursor], (uint8 *)TCHAR_TO_ANSI(*ChunkTypeCode), 4);
+    PNGBufferCursor += 4;
+    
+    //ChunkData
+    if (ChunkLength > 0)
     {
-        PNGBuffer.Serialize(Chunk_Data, Chunk_Length);
+        memcpy(&PNGBuffer[PNGBufferCursor], ChunkData, ChunkLength);
+        PNGBufferCursor += ChunkLength;
     }
-    uint32 crcIndex = PNGBuffer.Num() - Chunk_Length - 4;
-    uint32 Chunk_CRC = FCrc::MemCrc32(&PNGBuffer[crcIndex], Chunk_Length + 4);
-    uint32 Chunk_CRC_Swaped = SwapInt32(Chunk_CRC);
-    PNGBuffer << Chunk_CRC_Swaped;
-    UE_LOG(LogTemp, Warning, TEXT("PNG_%s + %d : %d"), *Chunk_Type_Code, Chunk_Length + 12, PNGBuffer.Num());
-}
-
-uint32 CGGraphicDecoder::SwapInt32(uint32 value)
-{
-    return ((value & 0x000000FF) << 24) |
-    ((value & 0x0000FF00) << 8) |
-    ((value & 0x00FF0000) >> 8) |
-    ((value & 0xFF000000) >> 24) ;
+   
+    //ChunkCRC
+    uint32 CRCIndex = PNGBufferCursor - ChunkLength - 4;
+    uint32 ChunkCRC = FCrc::MemCrc32(&PNGBuffer[CRCIndex], ChunkLength + 4);
+    uint32 ChunkCRCBigendian = bIsLittleEndian ? htonl(ChunkCRC) : ChunkCRC;
+    memcpy(&PNGBuffer[PNGBufferCursor], &ChunkCRCBigendian, 4);
+    PNGBufferCursor += 4;
+    
+    UE_LOG(LogTemp, Warning, TEXT("PNG_%s + %d : , BufferCursor : %d"), *ChunkTypeCode, ChunkLength + 12, PNGBufferCursor);
 }

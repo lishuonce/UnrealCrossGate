@@ -3,7 +3,6 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Serialization/BufferArchive.h"
 
 /**
  * 
@@ -12,7 +11,7 @@ class UNREALCROSSGATE_API CGGraphicDecoder
 {
 public:
 
-	static CGGraphicDecoder& GetSingletonObject();
+	static CGGraphicDecoder &Get();
 
 	CGGraphicDecoder();
 	~CGGraphicDecoder();
@@ -26,9 +25,6 @@ private:
 
 	IFileHandle *fileHandle;
 	FString fsResPath, fsGraphicInfoPath, fsGraphicDataPath, fsPaletDataPath;
-	uint8 *BufferData;
-	uint32 BufferDataLenth;
-    FBufferArchive PNGBuffer;
 
 private:
 
@@ -37,12 +33,11 @@ private:
 	void LoadGraphicInfo();
 	void LoadPaletData();
 	void InitGraphicData();
-	//GetColorFromPalet();
-	uint8 *JSSRLEDecode(uint8 *Buffer, uint32 SizeOfBuffer);
-    uint8 *CreatePNG(uint8 *Buffer, uint32 SizeOfBuffer, uint32 PicWidth, uint32 PicHeight);
-    void AddChunkToPNGBuffer(uint32 Chunk_Length, FString Chunk_Type_Code, void *Chunk_Data);
-    uint32 SwapInt32(uint32 value);
-    //uint8 *ChunkToPNG(uint32 Chunk_Length_IDAT, uint8 *Chunk_Type_Code_IDAT, uint8 *Chunk_IDAT, uint32 Chunk_CRC_IDAT);
+	uint8 *JSSRLEDecode(uint8 *Buffer, uint32 SizeOfBuffer, uint32 PicWidth, uint32 PicHeight);
+
+private:
+    uint8 *PNGEncode(uint8 *Buffer, uint32 SizeOfBuffer, uint32 PicWidth, uint32 PicHeight);
+    void AppendChunk(uint8 *PNGBuffer, uint32 &PNGBufferCursor, uint32 ChunkLength, FString ChunkTypeCode, void *ChunkData);
 
 private:
 
@@ -60,7 +55,7 @@ private:
 		uint8 gIsFloor;
 		uint8 unknown[5];
 		uint32 gMapId;
-	}*sGraphicInfo;
+	}*SGInfo;
 
 	struct PaletColor
 	{

@@ -9,6 +9,8 @@ AWorldGameModeBase::AWorldGameModeBase()
 
 void AWorldGameModeBase::BeginPlay()
 {
-	CGGraphicDecoder& CGGraphicDecoderSingle = CGGraphicDecoderSingle.GetSingletonObject();
-	CGGraphicDecoderSingle.GetDecodePngData(0, 2);
+    CGGraphicDecoder &CGGraphicDecoderSingle = CGGraphicDecoder::Get();
+    for (uint32 i = 0; i < 100; i++) {
+        CGGraphicDecoderSingle.GetDecodePngData(i, 0);
+    }
 }
