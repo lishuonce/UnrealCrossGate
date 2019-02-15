@@ -7,6 +7,7 @@ public class UnrealCrossGate : ModuleRules
 	public UnrealCrossGate(ReadOnlyTargetRules Target) : base(Target)
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
+        bEnforceIWYU = true;
 	
 		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore" });
 
