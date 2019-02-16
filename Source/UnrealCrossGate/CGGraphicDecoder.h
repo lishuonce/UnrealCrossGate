@@ -3,6 +3,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Paths.h"
+#include "PlatformFilemanager.h"
+#include "GenericPlatformFile.h"
 
 /**
  * 
@@ -33,10 +36,10 @@ private:
 	void LoadGraphicInfo();
 	void LoadPaletData();
 	void InitGraphicData();
-	uint8 *JSSRLEDecode(uint8 *Buffer, uint32 SizeOfBuffer, uint32 PicWidth, uint32 PicHeight);
+	void JSSRLEDecode(uint8 *BufferEncoded, uint32 SizeOfBufferEncoded, uint8 *BufferDecoded, uint32 SizeOfBufferDecoded);
 
 private:
-    uint8 *PNGEncode(uint8 *Buffer, uint32 SizeOfBuffer, uint32 PicWidth, uint32 PicHeight);
+    void PNGEncode(uint8 *Buffer, uint32 SizeOfBuffer, uint8 *PNGBuffer, uint32 &SizeOfPNGBuffer, uint32 PicWidth, uint32 PicHeight);
     void AppendChunk(uint8 *PNGBuffer, uint32 &PNGBufferCursor, uint32 ChunkLength, FString ChunkTypeCode, void *ChunkData);
 
 private:
@@ -66,12 +69,12 @@ private:
 
 	struct GraphicData
 	{
-		char gRD[2];
+		uint8 gRD[2];
 		uint8 gIscompressed;
 		uint8 unknown;
 		uint32 gWidth;
 		uint32 gHeight;
 		uint32 gLength;
-		uint8* gData;
+		uint8 *gData;
 	};
 };
