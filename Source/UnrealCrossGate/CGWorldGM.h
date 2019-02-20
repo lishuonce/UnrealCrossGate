@@ -4,25 +4,24 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/GameModeBase.h"
-#include "WorldGameModeBase.generated.h"
+#include "CGWorldGM.generated.h"
 
 /**
  * 
  */
 UCLASS()
-class UNREALCROSSGATE_API AWorldGameModeBase : public AGameModeBase
+class UNREALCROSSGATE_API ACGWorldGM : public AGameModeBase
 {
 	GENERATED_BODY()
-
-	DECLARE_LOG_CATEGORY_CLASS(WorldGameModeBase, Log, All);
-
+    DECLARE_LOG_CATEGORY_CLASS(CGWorldGM, Log, All);
+    
 public:
-
-	AWorldGameModeBase();
-
-	virtual void BeginPlay() override;
-
+    
+    ACGWorldGM();
+    
+    virtual void BeginPlay() override;
+    
 protected:
-
+    
 private:
 };
