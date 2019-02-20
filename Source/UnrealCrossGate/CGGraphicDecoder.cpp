@@ -29,20 +29,20 @@ CGGraphicDecoder::~CGGraphicDecoder()
     //dont implement
 }
 
-uint8 * CGGraphicDecoder::GetDecodePngData(uint32 GraphicId, uint8 PaletId)
+uint8 * CGGraphicDecoder::GetDecodePngData(uint32 GraphicId, FString PaletType)
 {
 	//DEBUG LOG - GraphicInfo
-    UE_LOG(LogTemp, Warning, TEXT("gId:%i"), SGInfo[GraphicId].gId);
-	UE_LOG(LogTemp, Warning, TEXT("gAddr:%i"), SGInfo[GraphicId].gAddr);
-	UE_LOG(LogTemp, Warning, TEXT("gLength:%i"), SGInfo[GraphicId].gLength);
-	UE_LOG(LogTemp, Warning, TEXT("gOffsetX:%i"), SGInfo[GraphicId].gOffsetX);
-	UE_LOG(LogTemp, Warning, TEXT("gOffsetY:%i"), SGInfo[GraphicId].gOffsetY);
-	UE_LOG(LogTemp, Warning, TEXT("gWidth:%i"), SGInfo[GraphicId].gWidth);
-	UE_LOG(LogTemp, Warning, TEXT("gHeight:%i"), SGInfo[GraphicId].gHeight);
-	UE_LOG(LogTemp, Warning, TEXT("gEast:%i"), SGInfo[GraphicId].gEast);
-	UE_LOG(LogTemp, Warning, TEXT("gSouth:%i"), SGInfo[GraphicId].gSouth);
-	UE_LOG(LogTemp, Warning, TEXT("gIsFloor:%i"), SGInfo[GraphicId].gIsFloor);
-	UE_LOG(LogTemp, Warning, TEXT("gMapId:%i"), SGInfo[GraphicId].gMapId);
+//    UE_LOG(LogTemp, Warning, TEXT("gId:%i"), SGInfo[GraphicId].gId);
+//    UE_LOG(LogTemp, Warning, TEXT("gAddr:%i"), SGInfo[GraphicId].gAddr);
+//    UE_LOG(LogTemp, Warning, TEXT("gLength:%i"), SGInfo[GraphicId].gLength);
+//    UE_LOG(LogTemp, Warning, TEXT("gOffsetX:%i"), SGInfo[GraphicId].gOffsetX);
+//    UE_LOG(LogTemp, Warning, TEXT("gOffsetY:%i"), SGInfo[GraphicId].gOffsetY);
+//    UE_LOG(LogTemp, Warning, TEXT("gWidth:%i"), SGInfo[GraphicId].gWidth);
+//    UE_LOG(LogTemp, Warning, TEXT("gHeight:%i"), SGInfo[GraphicId].gHeight);
+//    UE_LOG(LogTemp, Warning, TEXT("gEast:%i"), SGInfo[GraphicId].gEast);
+//    UE_LOG(LogTemp, Warning, TEXT("gSouth:%i"), SGInfo[GraphicId].gSouth);
+//    UE_LOG(LogTemp, Warning, TEXT("gIsFloor:%i"), SGInfo[GraphicId].gIsFloor);
+//    UE_LOG(LogTemp, Warning, TEXT("gMapId:%i"), SGInfo[GraphicId].gMapId);
     
     //Load GraphicData
 	if (fileHandle)
@@ -53,17 +53,17 @@ uint8 * CGGraphicDecoder::GetDecodePngData(uint32 GraphicId, uint8 PaletId)
 		fileHandle->Read((uint8 *)&SGData, 16);
         
         //DEBUG LOG - GraphicData
-        UE_LOG(LogTemp, Warning, TEXT("gRD:%c%c"), SGData.gRD[0], SGData.gRD[1]);
-		UE_LOG(LogTemp, Warning, TEXT("gIscompressed:%i"), SGData.gIscompressed);
-		UE_LOG(LogTemp, Warning, TEXT("gWidth:%i"), SGData.gWidth);
-		UE_LOG(LogTemp, Warning, TEXT("gHeight:%i"), SGData.gHeight);
-		UE_LOG(LogTemp, Warning, TEXT("gLength:%i"), SGData.gLength);
+//        UE_LOG(LogTemp, Warning, TEXT("gRD:%c%c"), SGData.gHeader[0], SGData.gHeader[1]);
+//        UE_LOG(LogTemp, Warning, TEXT("gIscompressed:%i"), SGData.gIscompressed);
+//        UE_LOG(LogTemp, Warning, TEXT("gWidth:%i"), SGData.gWidth);
+//        UE_LOG(LogTemp, Warning, TEXT("gHeight:%i"), SGData.gHeight);
+//        UE_LOG(LogTemp, Warning, TEXT("gLength:%i"), SGData.gLength);
 		
         //Load Data
 		uint32 GDataLength = SGInfo[GraphicId].gLength - 16;
 		SGData.gData = new uint8[GDataLength];
 		fileHandle->Read(SGData.gData, GDataLength);
-        UE_LOG(LogTemp, Warning, TEXT("%s"), *BytesToHex(SGData.gData, GDataLength));
+        //UE_LOG(LogTemp, Warning, TEXT("%s"), *BytesToHex(SGData.gData, GDataLength));
         
         uint8 *Buffer = SGData.gData;
         uint32 BufferSize = GDataLength;
@@ -83,17 +83,18 @@ uint8 * CGGraphicDecoder::GetDecodePngData(uint32 GraphicId, uint8 PaletId)
         //PNG: Encode
         BufferSize = 1105 + FCompression::CompressMemoryBound(COMPRESS_ZLIB, GDataLength + SGData.gHeight);
         Buffer = new uint8[BufferSize];
-        PNGEncode(SGData.gData, GDataLength, Buffer, BufferSize, SGData.gWidth, SGData.gHeight);
+        PNGEncode(SGData.gData, GDataLength, Buffer, BufferSize, SGData.gWidth, SGData.gHeight, PaletType);
         delete [] SGData.gData;
         SGData.gData = Buffer;
         Buffer = nullptr;
         GDataLength = BufferSize;
         
-        //Save PNGBuffer to random file
+        //Save PNGBuffer to Files
         FString fsTexturePath = FPaths::ProjectContentDir() + "Textures/MapTiles/";
+        //Filename : random
         //FString fsTmpPngPath = FPaths::CreateTempFilename(*fsTexturePath, TEXT("tmp"), TEXT(".png"));
-        //Save PNG files to name = GraphicID
-        FString fsTmpPngPath = fsTexturePath + FString::FromInt(GraphicId) + ".png";
+        //Filename : GraphicID + PaletType
+        FString fsTmpPngPath = fsTexturePath + FString::FromInt(GraphicId) + "_" + PaletType + ".png";
         IPlatformFile &platFormFile = FPlatformFileManager::Get().GetPlatformFile();
         IFileHandle *fileHandleTmp = platFormFile.OpenWrite(*fsTmpPngPath);
         if (fileHandleTmp)
@@ -136,8 +137,8 @@ bool CGGraphicDecoder::IsResVerified()
 
 void CGGraphicDecoder::LoadGraphicInfo()
 {
-	IPlatformFile &platFormFile = FPlatformFileManager::Get().GetPlatformFile();
-	IFileHandle *fileHandleTmp = platFormFile.OpenRead(*fsGraphicInfoPath);
+	IPlatformFile &PlatFormFile = FPlatformFileManager::Get().GetPlatformFile();
+	IFileHandle *fileHandleTmp = PlatFormFile.OpenRead(*fsGraphicInfoPath);
 	if (fileHandleTmp)
 	{
 		uint32 iFileSize = fileHandleTmp->Size();
@@ -150,38 +151,53 @@ void CGGraphicDecoder::LoadGraphicInfo()
 
 void CGGraphicDecoder::LoadPaletData()
 {
-	IPlatformFile &platFormFile = FPlatformFileManager::Get().GetPlatformFile();
-	IFileHandle *fileHandleTmp = platFormFile.OpenRead(*fsPaletDataPath);
-	if (fileHandleTmp)
-	{
-		//Palet Color 16 ~ 239
-		fileHandleTmp->Read((uint8 *)(sPalet_00 + 16), 672);
-		delete fileHandleTmp;
-	}
-    
-    uint8 CommonPaletA[48] = {
+    //Palet Color 0 ~ 15 (common)
+    uint8 CommonPaletHead[48] = {
         0x00,0x00,0x00,0x80,0x00,0x00,0x00,0x80,0x00,0x80,0x80,0x00,0x00,0x00,0x80,0x80,
         0x00,0x80,0x00,0x80,0x80,0xc0,0xc0,0xc0,0xc0,0xd0,0xc0,0xa6,0xca,0xf0,0xde,0x00,
         0x00,0xff,0x5f,0x00,0xff,0xff,0xa0,0x00,0x5f,0xd2,0x50,0xd2,0xff,0x28,0xe1,0x28};
-    
-    uint8 CommonPaletB[48] = {
+    //Palet Color 240 ~ 255 (common)
+    uint8 CommonPaletEnd[48] = {
         0xf5,0xc3,0x96,0x1e,0xa0,0x5f,0xc3,0x7d,0x46,0x9b,0x55,0x1e,0x46,0x41,0x37,0x28,
         0x23,0x1e,0xff,0xfb,0xf0,0x3a,0x6e,0xa5,0x80,0x80,0x80,0xff,0x00,0x00,0x00,0xff,
         0x00,0xff,0xff,0x00,0x00,0x00,0xff,0xff,0x80,0xff,0x00,0xff,0xff,0xff,0xff,0xff};
-
-	memcpy(sPalet_00, CommonPaletA, 48);
-	memcpy(sPalet_00 + 240, CommonPaletB, 48);
+    //Load Palet_*.cgp to PaletMap.sPalet
+    FString fsPaletPath = fsResPath + "bin/pal/";
+    FString fsPaletExten = ".cgp";
+    IPlatformFile &PlatFormFile = FPlatformFileManager::Get().GetPlatformFile();
     
-    for (uint8 i = 0; i < 255; i++)
+    TArray<FString> FileList;
+    FString PaletType;
+    PlatFormFile.FindFiles(FileList, *fsPaletPath, *fsPaletExten);
+    for (uint32 i = 0; i < FileList.Num(); i++)
     {
-        Swap(sPalet_00[i].Blue, sPalet_00[i].Red);
+        Palet sPalet;
+        IFileHandle *fileHandleTmp = PlatFormFile.OpenRead(*FileList[i]);
+        if (fileHandleTmp)
+        {
+            //Palet Color 16 ~ 239 (Palet_*.cgp)
+            fileHandleTmp->Read((uint8 *)(sPalet.sPalet + 16), 672);
+            delete fileHandleTmp;
+        }
+        //Set Palet (common)
+        memcpy(sPalet.sPalet, CommonPaletHead, 48);
+        memcpy(sPalet.sPalet + 240, CommonPaletEnd, 48);
+        //Convert BGR to RGB
+        for (uint8 j = 0; j < 255; j++)
+        {
+            Swap(sPalet.sPalet[j].Blue, sPalet.sPalet[j].Red);
+        }
+        //Add to PaletMAP
+        PaletType = FPaths::GetBaseFilename(FileList[i]).RightChop(6);
+        PaletMap.Emplace(PaletType, sPalet);
+        //UE_LOG(LogTemp, Warning, TEXT("PaletMap[%s] : %s"), *PaletType, *BytesToHex((uint8 *)&PaletMap[PaletType].sPalet, 768));
     }
 }
 
 void CGGraphicDecoder::InitGraphicData()
 {
-	IPlatformFile &platFormFile = FPlatformFileManager::Get().GetPlatformFile();
-	fileHandle = platFormFile.OpenRead(*fsGraphicDataPath);
+	IPlatformFile &PlatFormFile = FPlatformFileManager::Get().GetPlatformFile();
+	fileHandle = PlatFormFile.OpenRead(*fsGraphicDataPath);
 }
 
 void CGGraphicDecoder::JSSRLEDecode(uint8 *BufferEncoded, uint32 SizeOfBufferEncoded, uint8 *BufferDecoded, uint32 SizeOfBufferDecoded)
@@ -254,7 +270,7 @@ void CGGraphicDecoder::JSSRLEDecode(uint8 *BufferEncoded, uint32 SizeOfBufferEnc
             memcpy(&BufferDecoded[BufferDecodedCursor], &BufferEncoded[BufferEncodedCursor + High + 1], RLESize);
             BufferDecodedCursor += RLESize;
 			BufferEncodedCursor += High + 1 + RLESize;
-			UE_LOG(LogTemp, Warning, TEXT("RLE_READ: %d"), RLESize);
+			//UE_LOG(LogTemp, Warning, TEXT("RLE_READ: %d"), RLESize);
 			break;
 		case RLE_REPEAT_BACKGROUND:
 			RepeatBuffer = new uint8[RLESize];
@@ -263,16 +279,16 @@ void CGGraphicDecoder::JSSRLEDecode(uint8 *BufferEncoded, uint32 SizeOfBufferEnc
             BufferDecodedCursor += RLESize;
 			delete[] RepeatBuffer;
 			BufferEncodedCursor += (High % 4) + 2;
-			UE_LOG(LogTemp, Warning, TEXT("RLE_REPEAT_BACKGROUND: %d"), RLESize);
+			//UE_LOG(LogTemp, Warning, TEXT("RLE_REPEAT_BACKGROUND: %d"), RLESize);
 			break;
 		case RLE_REPEAT_TRANSPARENT:
 			RepeatBuffer = new uint8[RLESize];
-			memset(RepeatBuffer, 0x00, RLESize);//transparent color
+			memset(RepeatBuffer, 0xff, RLESize);//set transparent color
             memcpy(&BufferDecoded[BufferDecodedCursor], RepeatBuffer, RLESize);
             BufferDecodedCursor += RLESize;
 			delete[] RepeatBuffer;
 			BufferEncodedCursor += (High % 4) + 1;
-			UE_LOG(LogTemp, Warning, TEXT("RLE_REPEAT_TRANSPARENT: %d"), RLESize);
+			//UE_LOG(LogTemp, Warning, TEXT("RLE_REPEAT_TRANSPARENT: %d"), RLESize);
 			break;
 		default:
             UE_LOG(LogTemp, Error, TEXT("switch(ERLEFlags) Default: %x"), BufferEncoded[BufferEncodedCursor]);
@@ -282,16 +298,16 @@ void CGGraphicDecoder::JSSRLEDecode(uint8 *BufferEncoded, uint32 SizeOfBufferEnc
         ERLEFlags = RLE_NONE;
         
 	}//while CurrentDecodePosition < SizeOfBuffer END
-    UE_LOG(LogTemp, Warning, TEXT("Decoded Data size : %d"), BufferDecodedCursor);
+    //UE_LOG(LogTemp, Warning, TEXT("Decoded Data size : %d"), BufferDecodedCursor);
     
-    UE_LOG(LogTemp, Warning, TEXT("JSSRLEDecode size In Function: %d"), SizeOfBufferDecoded);
-    for (uint32 Line = 0; Line < 47; Line += 1)
-    {
-        UE_LOG(LogTemp, Error, TEXT("%s"), *BytesToHex(&BufferDecoded[64 * Line], 64));
-    }
+//    UE_LOG(LogTemp, Warning, TEXT("JSSRLEDecode size In Function: %d"), SizeOfBufferDecoded);
+//    for (uint32 Line = 0; Line < 47; Line += 1)
+//    {
+//        UE_LOG(LogTemp, Log, TEXT("%s"), *BytesToHex(&BufferDecoded[64 * Line], 64));
+//    }
 }
 
-void CGGraphicDecoder::PNGEncode(uint8 *Buffer, uint32 SizeOfBuffer, uint8 *PNGBuffer, uint32 &SizeOfPNGBuffer, uint32 PicWidth, uint32 PicHeight)
+void CGGraphicDecoder::PNGEncode(uint8 *Buffer, uint32 SizeOfBuffer, uint8 *PNGBuffer, uint32 &SizeOfPNGBuffer, uint32 PicWidth, uint32 PicHeight, FString PaletType)
 {
     //Line Format
     uint32 SizeOfBufferFormated = SizeOfBuffer + PicHeight;
@@ -307,8 +323,7 @@ void CGGraphicDecoder::PNGEncode(uint8 *Buffer, uint32 SizeOfBuffer, uint8 *PNGB
         CursorFormated = LineFormated * (PicWidth + 1);
         BufferFormated[CursorFormated] = 0x00;
         memcpy(&BufferFormated[CursorFormated + 1], &Buffer[Cursor], PicWidth);
-        
-        UE_LOG(LogTemp, Error, TEXT("%s"), *BytesToHex(&BufferFormated[CursorFormated], PicWidth + 1));
+        //UE_LOG(LogTemp, Log, TEXT("%s"), *BytesToHex(&BufferFormated[CursorFormated], PicWidth + 1));
     }
     
     //PNGBuffer Cursor reset
@@ -338,11 +353,12 @@ void CGGraphicDecoder::PNGEncode(uint8 *Buffer, uint32 SizeOfBuffer, uint8 *PNGB
     AppendChunk(PNGBuffer, PNGBufferCursor, 13, "IHDR", &sChunk_IHDR);
     
     //Chunk_PLTE
-    AppendChunk(PNGBuffer, PNGBufferCursor, 768, "PLTE", sPalet_00);
+    AppendChunk(PNGBuffer, PNGBufferCursor, 768, "PLTE", PaletMap[PaletType].sPalet);
     
     //Chunk_tRNS
-    PaletColor Chunk_tRNS[256] = {{0x00, 0x00, 0x00}};//set transparent color
-    memset(Chunk_tRNS + 1, (0xff, 0xff, 0xff), 255);
+    PaletColor Chunk_tRNS[256];
+    memset(Chunk_tRNS, (0xff, 0xff, 0xff), 255);
+    Chunk_tRNS[255] = {0x00, 0x00, 0x00};//set transparent color
     AppendChunk(PNGBuffer, PNGBufferCursor, 256, "tRNS", Chunk_tRNS);
     
     //Chunk_IDAT
@@ -392,4 +408,34 @@ void CGGraphicDecoder::AppendChunk(uint8 *PNGBuffer, uint32 &PNGBufferCursor, ui
     PNGBufferCursor += 4;
     
     UE_LOG(LogTemp, Warning, TEXT("PNG_%s + %d : , BufferCursor : %d"), *ChunkTypeCode, ChunkLength + 12, PNGBufferCursor);
+}
+
+void CGGraphicDecoder::test()
+{
+    IPlatformFile &platFormFile = FPlatformFileManager::Get().GetPlatformFile();
+    IFileHandle *fileHandleTmp = platFormFile.OpenRead(*fsGraphicDataPath);
+    GraphicData SGData[253662];
+    uint8 unknownarr[253662];
+    if (fileHandleTmp)
+    {
+        for (uint32 i = 0; i < 253662; i++) {
+            fileHandle->Seek(SGInfo[i].gAddr);
+            fileHandle->Read((uint8 *)&SGData[i], 16);
+            unknownarr[i] = SGData[i].unknown;
+        }
+        delete fileHandleTmp;
+    }
+    FString fsTmpPath = fsResPath + "test.bin";
+    IFileHandle *fileHandleTmp2 = platFormFile.OpenWrite(*fsTmpPath);
+    if (fileHandleTmp2) {
+        fileHandleTmp2->Write(unknownarr, 253662);
+        delete fileHandleTmp2;
+    }
+}
+
+TArray<FString> CGGraphicDecoder::GetPaletTypeList()
+{
+    TArray<FString> PaletMapKey;
+    PaletMap.GenerateKeyArray(PaletMapKey);
+    return PaletMapKey;
 }

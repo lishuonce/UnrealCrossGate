@@ -22,7 +22,9 @@ public:
 	CGGraphicDecoder(CGGraphicDecoder const&) = delete;
 	void operator=(CGGraphicDecoder const&) = delete;
 
-	uint8 * GetDecodePngData(uint32 GraphicId, uint8 PaletId);
+	uint8 * GetDecodePngData(uint32 GraphicId, FString PaletType);
+    void test();
+    TArray<FString> GetPaletTypeList();
 
 private:
 
@@ -39,7 +41,7 @@ private:
 	void JSSRLEDecode(uint8 *BufferEncoded, uint32 SizeOfBufferEncoded, uint8 *BufferDecoded, uint32 SizeOfBufferDecoded);
 
 private:
-    void PNGEncode(uint8 *Buffer, uint32 SizeOfBuffer, uint8 *PNGBuffer, uint32 &SizeOfPNGBuffer, uint32 PicWidth, uint32 PicHeight);
+    void PNGEncode(uint8 *Buffer, uint32 SizeOfBuffer, uint8 *PNGBuffer, uint32 &SizeOfPNGBuffer, uint32 PicWidth, uint32 PicHeight, FString PaletType);
     void AppendChunk(uint8 *PNGBuffer, uint32 &PNGBufferCursor, uint32 ChunkLength, FString ChunkTypeCode, void *ChunkData);
 
 private:
@@ -56,7 +58,8 @@ private:
 		uint8 gEast;
 		uint8 gSouth;
 		uint8 gIsFloor;
-		uint8 unknown[5];
+        uint8 gIsSpecial;//!(gWidth=64&gHeight=47&gOffsetX=-32&gOffsetY=-24)
+		uint8 IsReserved[4];
 		uint32 gMapId;
 	}*SGInfo;
 
@@ -65,11 +68,17 @@ private:
 		uint8 Blue;
 		uint8 Green;
 		uint8 Red;
-	}sPalet_00[256], sPalet_01[256], sPalet_02[256], sPalet_03[256];
-
+	}sPalet_00[256];
+    
+    struct Palet {
+        PaletColor sPalet[256];
+    };
+    
+    TMap<FString, Palet> PaletMap;
+    
 	struct GraphicData
 	{
-		uint8 gRD[2];
+        uint8 gHeader[2];//RD : Render Data
 		uint8 gIscompressed;
 		uint8 unknown;
 		uint32 gWidth;
