@@ -13,7 +13,6 @@ UCLASS()
 class UNREALCROSSGATE_API ACGWorldGM : public AGameModeBase
 {
 	GENERATED_BODY()
-    DECLARE_LOG_CATEGORY_CLASS(CGWorldGM, Log, All);
     
 public:
     

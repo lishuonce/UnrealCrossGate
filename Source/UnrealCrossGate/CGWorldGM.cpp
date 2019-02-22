@@ -3,7 +3,7 @@
 #include "CGWorldGM.h"
 #include "CGGraphicDecoder.h"
 
-DEFINE_LOG_CATEGORY_CLASS(ACGWorldGM,  CGWorldGM)
+DEFINE_LOG_CATEGORY_STATIC(CGWorldGM, Log, All);
 
 ACGWorldGM::ACGWorldGM()
 {
@@ -11,14 +11,19 @@ ACGWorldGM::ACGWorldGM()
 
 void ACGWorldGM::BeginPlay()
 {
-    CGGraphicDecoder &CGGraphicDecoderSingle = CGGraphicDecoder::Get();
+//    FCGGraphicDecoder &CGGraphicDecoderSingle = FCGGraphicDecoder::Get();
+//    CGGraphicDecoderSingle.GetDecodePngData(19713, "00");
 //    for (uint32 i = 0; i < 100; i++) {
-//        CGGraphicDecoderSingle.GetDecodePngData(i, 0);
+//        CGGraphicDecoderSingle.GetDecodePngData(i, "00");
 //    }
-    TArray<FString> PaletMapKey = CGGraphicDecoderSingle.GetPaletTypeList();
-    for (auto Key = PaletMapKey.CreateConstIterator(); Key; ++Key)
-    {
-        CGGraphicDecoderSingle.GetDecodePngData(19713, *Key);
-    }
-//    CGGraphicDecoderSingle.test();
+//    TArray<FString> PaletMapKey = CGGraphicDecoderSingle.GetPaletTypeList();
+//    for (auto Key = PaletMapKey.CreateConstIterator(); Key; ++Key)
+//    {
+//        CGGraphicDecoderSingle.GetDecodePngData(19713, *Key);
+//    }
+//    for (auto Key = PaletMapKey.CreateConstIterator(); Key; ++Key)
+//    {
+//        CGGraphicDecoderSingle.GetDecodePngData(30, *Key);
+//    }
+    
 }
