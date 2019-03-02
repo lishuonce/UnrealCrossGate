@@ -1,9 +1,9 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "CGGraphicDecoder.h"
-#include "Paths.h"
-#include "PlatformFilemanager.h"
-#include "GenericPlatformFile.h"
+#include "Runtime/Core/Public/Misc/Paths.h"
+#include "Runtime/Core/Public/HAL/PlatformFilemanager.h"
+#include "Runtime/Core/Public/GenericPlatform/GenericPlatformFile.h"
 
 DEFINE_LOG_CATEGORY_STATIC(CGGraphicDecoder, Display, Display);
 
@@ -53,47 +53,47 @@ uint8 * FCGGraphicDecoder::GetDecodePngData(uint32 GraphicId, FString PaletType)
     if (fileHandle)
     {
         //Load Graphic_*.bin Header
-        GraphicData SGData;
+        GraphicData SGData2;
         fileHandle->Seek(SGInfo[GraphicId].gAddr);
-        fileHandle->Read((uint8 *)&SGData, 16);
-        UE_LOG(CGGraphicDecoder, Log, TEXT("gRD:%c%c"), SGData.gHeader[0], SGData.gHeader[1]);
-        UE_LOG(CGGraphicDecoder, Log, TEXT("gIscompressed:%d"), SGData.gIscompressed);
-        UE_LOG(CGGraphicDecoder, Log, TEXT("unknown:%x"), SGData.unknown);
-        UE_LOG(CGGraphicDecoder, Log, TEXT("gWidth:%d"), SGData.gWidth);
-        UE_LOG(CGGraphicDecoder, Log, TEXT("gHeight:%d"), SGData.gHeight);
-        UE_LOG(CGGraphicDecoder, Log, TEXT("gLength:%d"), SGData.gLength);
+        fileHandle->Read((uint8 *)&SGData2, 16);
+        UE_LOG(CGGraphicDecoder, Log, TEXT("gRD:%c%c"), SGData2.gHeader[0], SGData2.gHeader[1]);
+        UE_LOG(CGGraphicDecoder, Log, TEXT("gIscompressed:%d"), SGData2.gIscompressed);
+        UE_LOG(CGGraphicDecoder, Log, TEXT("unknown:%x"), SGData2.unknown);
+        UE_LOG(CGGraphicDecoder, Log, TEXT("gWidth:%d"), SGData2.gWidth);
+        UE_LOG(CGGraphicDecoder, Log, TEXT("gHeight:%d"), SGData2.gHeight);
+        UE_LOG(CGGraphicDecoder, Log, TEXT("gLength:%d"), SGData2.gLength);
         
         //Load Graphic_*.bin gData
         uint32 GDataLength = SGInfo[GraphicId].gLength - 16;
-        SGData.gData = new uint8[GDataLength];
-        fileHandle->Read(SGData.gData, GDataLength);
-        UE_LOG(CGGraphicDecoder, Log, TEXT("%s"), *BytesToHex(SGData.gData, GDataLength));
+        SGData2.gData = new uint8[GDataLength];
+        fileHandle->Read(SGData2.gData, GDataLength);
+        UE_LOG(CGGraphicDecoder, Log, TEXT("%s"), *BytesToHex(SGData2.gData, GDataLength));
         
-        uint8 *Buffer = SGData.gData;
+        uint8 *Buffer = SGData2.gData;
         uint32 BufferSize = GDataLength;
         
         //JSSRLEDecode gData
-        if (SGData.gIscompressed)
+        if (SGData2.gIscompressed)
         {
-            BufferSize = SGData.gWidth * SGData.gHeight;
+            BufferSize = SGData2.gWidth * SGData2.gHeight;
             Buffer = new uint8[BufferSize];
-            JSSRLEDecode(SGData.gData, GDataLength, Buffer, BufferSize);
-            delete [] SGData.gData;
-            SGData.gData = Buffer;
+            JSSRLEDecode(SGData2.gData, GDataLength, Buffer, BufferSize);
+            delete [] SGData2.gData;
+            SGData2.gData = Buffer;
             Buffer = nullptr;
             GDataLength = BufferSize;
         }
-        for (uint32 Line = 0; Line < SGData.gHeight; Line++)
+        for (uint32 Line = 0; Line < SGData2.gHeight; Line++)
         {
-            UE_LOG(CGGraphicDecoder, Log, TEXT("%s"), *BytesToHex(&SGData.gData[SGData.gWidth * Line], SGData.gWidth));
+            UE_LOG(CGGraphicDecoder, Log, TEXT("%s"), *BytesToHex(&SGData2.gData[SGData2.gWidth * Line], SGData2.gWidth));
         }
         
         //PNGEncode gData
-        BufferSize = 1105 + FCompression::CompressMemoryBound(COMPRESS_ZLIB, GDataLength + SGData.gHeight);
+        BufferSize = 1105 + FCompression::CompressMemoryBound(COMPRESS_ZLIB, GDataLength + SGData2.gHeight);
         Buffer = new uint8[BufferSize];
-        PNGEncode(SGData.gData, GDataLength, Buffer, BufferSize, SGData.gWidth, SGData.gHeight, PaletType);
-        delete [] SGData.gData;
-        SGData.gData = Buffer;
+        PNGEncode(SGData2.gData, GDataLength, Buffer, BufferSize, SGData2.gWidth, SGData2.gHeight, PaletType);
+        delete [] SGData2.gData;
+        SGData2.gData = Buffer;
         Buffer = nullptr;
         GDataLength = BufferSize;
         
@@ -105,12 +105,12 @@ uint8 * FCGGraphicDecoder::GetDecodePngData(uint32 GraphicId, FString PaletType)
         IFileHandle *fileHandleTmp = platFormFile.OpenWrite(*fsTmpPngPath);
         if (fileHandleTmp)
         {
-            fileHandleTmp->Write(SGData.gData, GDataLength);
+            fileHandleTmp->Write(SGData2.gData, GDataLength);
             delete fileHandleTmp;
         }
         
         //return gData
-        return SGData.gData;
+        return SGData2.gData;
     }
     return nullptr;
 }
@@ -199,6 +199,8 @@ void FCGGraphicDecoder::LoadPaletData()
         PaletMap.Emplace(PaletType, sPalet);
         UE_LOG(CGGraphicDecoder, Log, TEXT("PaletMap[%s] : %s"), *PaletType, *BytesToHex((uint8 *)&PaletMap[PaletType].sPalet, 768));
     }
+    
+    PaletMap.GenerateKeyArray(PaletTypes);
 }
 
 void FCGGraphicDecoder::InitGraphicData()
@@ -409,34 +411,4 @@ void FCGGraphicDecoder::AppendChunk(uint8 *PNGBuffer, uint32 &PNGBufferCursor, u
     PNGBufferCursor += 4;
     
     UE_LOG(CGGraphicDecoder, Log, TEXT("PNG_%s + %d : , BufferCursor : %d"), *ChunkTypeCode, ChunkLength + 12, PNGBufferCursor);
-}
-
-void FCGGraphicDecoder::test()
-{
-    IPlatformFile &platFormFile = FPlatformFileManager::Get().GetPlatformFile();
-    IFileHandle *fileHandleTmp = platFormFile.OpenRead(*fsGraphicDataPath);
-    GraphicData SGData[253662];
-    uint8 unknownarr[253662];
-    if (fileHandleTmp)
-    {
-        for (uint32 i = 0; i < 253662; i++) {
-            fileHandle->Seek(SGInfo[i].gAddr);
-            fileHandle->Read((uint8 *)&SGData[i], 16);
-            unknownarr[i] = SGData[i].unknown;
-        }
-        delete fileHandleTmp;
-    }
-    FString fsTmpPath = fsResPath + "test.bin";
-    IFileHandle *fileHandleTmp2 = platFormFile.OpenWrite(*fsTmpPath);
-    if (fileHandleTmp2) {
-        fileHandleTmp2->Write(unknownarr, 253662);
-        delete fileHandleTmp2;
-    }
-}
-
-TArray<FString> FCGGraphicDecoder::GetPaletTypeList()
-{
-    TArray<FString> PaletMapKey;
-    PaletMap.GenerateKeyArray(PaletMapKey);
-    return PaletMapKey;
 }
