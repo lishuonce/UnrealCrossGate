@@ -1,7 +1,8 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+
 
 #pragma once
 #include "CoreMinimal.h"
+#include "Runtime/Engine/Classes/Engine/Texture2D.h"
 
 /**
  * Date: March 2, 2019
@@ -18,7 +19,7 @@ class UNREALCROSSGATE_API FCGGraphicDecoder
 
 private:
     
-    //struct of bin/Graphic*_Info.bin
+    // struct of bin/Graphic*_Info.bin
     struct GraphicInfo
     {
         uint32 gId;
@@ -31,15 +32,16 @@ private:
         uint8 gEast;
         uint8 gSouth;
         uint8 gIsFloor;
-        uint8 gIsNonStd;//Std:gWidth=64&gHeight=47&gOffsetX=-32&gOffsetY=-24
+		// Std:gWidth=64&gHeight=47&gOffsetX=-32&gOffsetY=-24
+        uint8 gIsNonStd;
         uint8 IsReserved[4];
         uint32 gMapId;
     };
     
-    //struct of bin/Graphic*.bin
+    // struct of bin/Graphic*.bin
     struct GraphicData
     {
-        uint8 gHeader[2];//RD : Render Data
+        uint8 gHeader[2];// RD : Render Data
         uint8 gIscompressed;
         uint8 unknown;
         uint32 gWidth;
@@ -48,7 +50,7 @@ private:
         uint8 *gData;
     };
     
-    //struct of bin/pal/palet_*.cgp
+    // struct of bin/pal/palet_*.cgp
     struct PaletColor
     {
         uint8 Blue;
@@ -60,12 +62,14 @@ private:
         PaletColor sPalet[256];
     };
     
-    TMap<FString, Palet> PaletMap;
+	uint8 alpha_index;
+	uint8 alpha_level;// 0x00:transparent 0xff:non-transparent
+	TMap<FString, Palet> PaletMap;
     GraphicInfo * SGInfo;
     GraphicData SGData;
-    TArray<FColor> ColorBuff;
+    FColor * ColorBuff;
     
-    IFileHandle *fileHandle;
+    IFileHandle *FileHandle;
     FString fsResPath, fsGraphicInfoPath, fsGraphicDataPath, fsPaletDataPath;
     
 public:
@@ -74,7 +78,7 @@ public:
     
 public:
     
-    static FCGGraphicDecoder &Get();
+	static FCGGraphicDecoder &Get();
     
     FCGGraphicDecoder();
     ~FCGGraphicDecoder();
@@ -83,25 +87,33 @@ public:
     void operator=(FCGGraphicDecoder const&) = delete;
     
     uint8 * GetDecodePngData(uint32 GraphicId, FString PaletType);
-    TArray<FColor> * GetColorBuff(uint32 GraphicId, FString PaletType);
+	UTexture2D * GetTexture2D(uint32 GraphicId, FString PaletType);
     
 private:
     
     void SetResPath();
+
     bool IsResVerified();
-    //load bin/Graphic*_Info.bin to *SGInfo
+
+    // load bin/Graphic*_Info.bin to *SGInfo
     void LoadGraphicInfo();
-    //load bin/pal/palet_*.cgp to TMap<FString, Palet> PaletMap
+
+    // load bin/pal/palet_*.cgp to TMap<FString, Palet> PaletMap
     void LoadPaletData();
-    //init filehandle for bin/Graphic*.bin
+
+    // init filehandle for bin/Graphic*.bin
     void InitGraphicData();
-    //set SGData by GraphicId
-    void SetGraphicData(uint32 GraphicId);
-    //if GraphicData is compressed, decode(JSS-RLE) SGData.gData
+
+    // load bin/Graphic*.bin to SGData by GraphicId
+    void LoadGraphicData(uint32 GraphicId);
+
+    // if GraphicData is compressed, decode(JSS-RLE) SGData.gData
     void DecodeGraphicData();
-    //set ColorBuff by PaletType
+
+    // set ColorBuff by PaletType
     void SetColorBuff(FString PaletType);
-    //todo : reimplement by DecodeGraphicData()
+
+    // todo : reimplement by DecodeGraphicData()
     void JSSRLEDecode(uint8 *BufferEncoded, uint32 SizeOfBufferEncoded, uint8 *BufferDecoded, uint32 SizeOfBufferDecoded);
     
 private:
