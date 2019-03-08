@@ -2,11 +2,14 @@
 
 #pragma once
 #include "CoreMinimal.h"
-#include "Runtime/Engine/Classes/Engine/Texture2D.h"
+#include "Engine/Texture2D.h"
 
 /**
  * Date: March 2, 2019
  * Author: lishuonce@gmail.com
+ * Importance:
+ * The class dont inherit from any UClass
+ * Garbage collection manually
  * Description:
  * Full Impletment Decode CrossGate Raw Assets:
  * bin/Graphic*_Info.bin
@@ -86,7 +89,6 @@ public:
     FCGGraphicDecoder(FCGGraphicDecoder const&) = delete;
     void operator=(FCGGraphicDecoder const&) = delete;
     
-    uint8 * GetDecodePngData(uint32 GraphicId, FString PaletType);
 	UTexture2D * GetTexture2D(uint32 GraphicId, FString PaletType);
     
 private:
@@ -109,16 +111,11 @@ private:
 
     // if GraphicData is compressed, decode(JSS-RLE) SGData.gData
     void DecodeGraphicData();
+    
+    // format GraphicData from Down-Left to Top-Left
+    void FormatGraphicData();
 
     // set ColorBuff by PaletType
     void SetColorBuff(FString PaletType);
-
-    // todo : reimplement by DecodeGraphicData()
-    void JSSRLEDecode(uint8 *BufferEncoded, uint32 SizeOfBufferEncoded, uint8 *BufferDecoded, uint32 SizeOfBufferDecoded);
-    
-private:
-    
-    void PNGEncode(uint8 *Buffer, uint32 SizeOfBuffer, uint8 *PNGBuffer, uint32 &SizeOfPNGBuffer, uint32 PicWidth, uint32 PicHeight, FString PaletType);
-    void AppendChunk(uint8 *PNGBuffer, uint32 &PNGBufferCursor, uint32 ChunkLength, FString ChunkTypeCode, void *ChunkData);
     
 };
