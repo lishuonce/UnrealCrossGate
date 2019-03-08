@@ -9,12 +9,12 @@ public class UnrealCrossGate : ModuleRules
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
         bEnforceIWYU = true;
 	
-		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "Paper2D"});
+		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "Paper2D", "UMG"});
 
 		PrivateDependencyModuleNames.AddRange(new string[] {  });
         
 		// Uncomment if you are using Slate UI
-		// PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore" });
+         PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore" });
 		
 		// Uncomment if you are using online features
 		// PrivateDependencyModuleNames.Add("OnlineSubsystem");
