@@ -51,10 +51,10 @@ UTexture2D * FCGGraphicDecoder::GetTexture2D(uint32 GraphicId, FString PaletType
     
     SetColorBuff(PaletType);
     
+	// create Texture2D
     UTexture2D *Tex2d = UTexture2D::CreateTransient(SGData.gWidth, SGData.gHeight, PF_B8G8R8A8);
     FTexture2DMipMap& Mip = Tex2d->PlatformData->Mips[0];
     void* Data = Mip.BulkData.Lock(LOCK_READ_WRITE);
-    //uint8* Data = static_cast<uint8*>(Mip.BulkData.Lock(LOCK_READ_WRITE));
     FMemory::Memcpy(Data, ColorBuff, SGData.gLength * sizeof(FColor));
     Mip.BulkData.Unlock();
     Tex2d->UpdateResource();
@@ -68,6 +68,46 @@ UTexture2D * FCGGraphicDecoder::GetTexture2D(uint32 GraphicId, FString PaletType
     
     
     return Tex2d;
+}
+
+void FCGGraphicDecoder::SaveToPng(uint32 GraphicId, FString PaletType)
+{
+	LoadGraphicData(GraphicId);
+
+	if (SGData.gIscompressed)
+	{
+		DecodeGraphicData();
+	}
+
+	FormatGraphicData();
+
+	SetColorBuff(PaletType);
+
+	// create png array
+	TArray<FColor> SrcData;
+	SrcData.Append(ColorBuff, SGData.gLength);
+	TArray<uint8> DstData;
+	FImageUtils::CompressImageArray(SGData.gWidth, SGData.gHeight, SrcData, DstData);
+
+	// save png file
+	FString fsTexturePath = FPaths::ProjectContentDir() + "CGRawDecode/MapTiles/";
+	// FString fsTmpPngPath = FPaths::CreateTempFilename(*fsTexturePath, TEXT("tmp"), TEXT(".png"));// Filename : random
+	FString fsTmpPngPath = fsTexturePath + FString::FromInt(GraphicId) + "_" + PaletType + ".png";// Filename : GraphicID + PaletType
+	IPlatformFile &platFormFile = FPlatformFileManager::Get().GetPlatformFile();
+	IFileHandle *fileHandleTmp = platFormFile.OpenWrite(*fsTmpPngPath);
+	if (fileHandleTmp)
+	{
+		fileHandleTmp->Write(DstData.GetData(), DstData.Num());
+		delete fileHandleTmp;
+	}
+
+	// gc SGData.gData , ColorBuff
+	delete[] SGData.gData;
+	SGData.gData = nullptr;
+
+	delete[] ColorBuff;
+	ColorBuff = nullptr;
+
 }
 
 void FCGGraphicDecoder::SetResPath()

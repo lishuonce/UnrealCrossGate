@@ -90,6 +90,7 @@ public:
     void operator=(FCGGraphicDecoder const&) = delete;
     
 	UTexture2D * GetTexture2D(uint32 GraphicId, FString PaletType);
+	void SaveToPng(uint32 GraphicId, FString PaletType);
     
 private:
     
