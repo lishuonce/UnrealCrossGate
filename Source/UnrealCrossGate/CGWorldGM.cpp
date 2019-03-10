@@ -21,16 +21,20 @@ void ACGWorldGM::BeginPlay()
     
     FCGGraphicDecoder &CGGraphicDecoderSingle = FCGGraphicDecoder::Get();
     
-	for (uint32 i = 4; i <= 388; i++) {
+	/*for (uint32 i = 0; i <= 7425; i++) {
         CGGraphicDecoderSingle.SaveToPng(i, "00");
-    }
+    }*/
+
+	/*for (uint32 i = 0; i <= 7425; i++) {
+		CGGraphicDecoderSingle.SaveMapToPng(i);
+	}*/
 
     /*TArray<FString> &PaletMapKey = CGGraphicDecoderSingle.PaletTypes;
     for (auto Key = PaletMapKey.CreateConstIterator(); Key; ++Key)
     {
         CGGraphicDecoderSingle.GetDecodePngData(19713, *Key);
-    }
-       
+    }*/
+
     /*UWorld* const World = GetWorld();
     if (World) {
 

@@ -36,7 +36,7 @@ private:
         uint8 gSouth;
         uint8 gIsFloor;
 		// Std:gWidth=64&gHeight=47&gOffsetX=-32&gOffsetY=-24
-        uint8 gIsNonStd;
+        uint8 gIsNonStd;// 0=Std, 1=NonStd
         uint8 IsReserved[4];
         uint32 gMapId;
     };
@@ -62,22 +62,41 @@ private:
     };
     struct Palet
     {
-        PaletColor sPalet[256];
+        PaletColor PaletArray[256];
     };
+
+	// struct of map/*/*.dat
+	struct MapFlag
+	{
+		uint8 fTransit;// 0x10=MapTransit, 0x0=NoTransit
+		uint8 fPass;// 0x192=Pass, 0x193=CannotPass, 0x0=NoMap
+	};
+	struct GraphicMap
+	{
+		uint8 mHeader[3];// MAP
+		uint8 mBlank[9];
+		uint32 mWeight;
+		uint32 mHeight;
+		uint16 *mGroundLayer;
+		uint16 *mCoverLayer;
+		MapFlag *mFlagLayer;
+	};
     
 	uint8 alpha_index;
 	uint8 alpha_level;// 0x00:transparent 0xff:non-transparent
-	TMap<FString, Palet> PaletMap;
-    GraphicInfo * SGInfo;
-    GraphicData SGData;
+	TMap<FString, Palet> CGPalet;
+    GraphicInfo * CGInfo;
+    GraphicData CGData;
     FColor * ColorBuff;
+	GraphicMap CGMap;
     
     IFileHandle *FileHandle;
-    FString fsResPath, fsGraphicInfoPath, fsGraphicDataPath, fsPaletDataPath;
+	FString fsResPath, fsGraphicInfoPath, fsGraphicDataPath;
     
 public:
     
     TArray<FString> PaletTypes;
+	TArray<uint32> MapList;
     
 public:
     
@@ -91,23 +110,30 @@ public:
     
 	UTexture2D * GetTexture2D(uint32 GraphicId, FString PaletType);
 	void SaveToPng(uint32 GraphicId, FString PaletType);
+	void SaveMapToPng(uint32 GraphicId, FString PaletType = "00");
     
 private:
     
     void SetResPath();
 
     bool IsResVerified();
+	
+	// load map/*.dat to MapList
+	void LoadMapList();
 
-    // load bin/Graphic*_Info.bin to *SGInfo
+	// load map/*.dat to CGMap
+	void LoadMapData(uint32 MapId);
+
+    // load bin/Graphic*_Info.bin to *CGInfo
     void LoadGraphicInfo();
 
-    // load bin/pal/palet_*.cgp to TMap<FString, Palet> PaletMap
+    // load bin/pal/palet_*.cgp to TMap<FString, Palet> CGPalet
     void LoadPaletData();
 
     // init filehandle for bin/Graphic*.bin
     void InitGraphicData();
 
-    // load bin/Graphic*.bin to SGData by GraphicId
+    // load bin/Graphic*.bin to CGData by GraphicId
     void LoadGraphicData(uint32 GraphicId);
 
     // if GraphicData is compressed, decode(JSS-RLE) SGData.gData
