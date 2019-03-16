@@ -12,6 +12,9 @@
  * Garbage collection manually
  * Description:
  * Full Impletment Decode CrossGate Raw Assets:
+ * map/ *.dat
+ * bin/AnimeInfo*.bin
+ * bin/Anime*.bin
  * bin/Graphic*_Info.bin
  * bin/Graphic*.bin
  * bin/pal/palet_*.cgp
@@ -50,7 +53,7 @@ private:
         uint32 gWidth;
         uint32 gHeight;
         uint32 gLength;
-        uint8 *gData;
+        uint8 *gData; //  bytesize = gLength -16
     };
     
     // struct of bin/pal/palet_*.cgp
@@ -60,9 +63,9 @@ private:
         uint8 Green;
         uint8 Red;
     };
-    struct Palet
+    struct PaletData
     {
-        PaletColor PaletArray[256];
+        PaletColor ColorData[256];
     };
 
 	// struct of map/*/*.dat
@@ -77,21 +80,50 @@ private:
 		uint8 mBlank[9];
 		uint32 mWeight;
 		uint32 mHeight;
-		uint16 *mGroundLayer;
-		uint16 *mCoverLayer;
-		MapFlag *mFlagLayer;
+		uint16 *mTerrainLayer;// bytesize = mWeight * mHeight *2
+		uint16 *mArtifactLayer;// bytesize = mWeight * mHeight *2
+		MapFlag *mFlagLayer;// bytesize = mWeight * mHeight *2
 	};
     
+    // struct of bin/AnimeInfo_*.bin
+    struct AnimeInfo
+    {
+        uint32 aId;
+        uint32 aAddr;
+        uint16 aNum;
+        uint16 unknown;
+    };
+    
+    // struct of bin/Anime_*.bin
+    struct AnimeFrame
+    {
+        uint32 pId;
+        uint8 unknown[6];
+    };
+    struct AnimeData
+    {
+        uint16 aDirctionId;// 0~7
+        uint16 aMovementId;
+        uint32 aDuration;// unit: ms
+        uint32 aFrameNum;
+        AnimeFrame *FrameData;// (byte)length = aFrameNum * 10
+    };
+    
+    // init load
 	uint8 alpha_index;
 	uint8 alpha_level;// 0x00:transparent 0xff:non-transparent
-	TMap<FString, Palet> CGPalet;
+	TMap<FString, PaletData> CGPalet;
+    AnimeInfo * CGAnimeInfo;
     GraphicInfo * CGInfo;
+    
+    // runtime set
+    AnimeData CGAnimeData;
     GraphicData CGData;
+    GraphicMap CGMap;
     FColor * ColorBuff;
-	GraphicMap CGMap;
     
     IFileHandle *FileHandle;
-	FString fsResPath, fsGraphicInfoPath, fsGraphicDataPath;
+	FString fsResPath, fsGraphicInfoPath, fsGraphicDataPath, fsAnimeInfoPath, fsAnimeDataPath;
     
 public:
     
@@ -117,12 +149,18 @@ private:
     void SetResPath();
 
     bool IsResVerified();
-	
-	// load map/*.dat to MapList
+    
+    // load map/*.dat to MapList
 	void LoadMapList();
 
 	// load map/*.dat to CGMap
 	void LoadMapData(uint32 MapId);
+    
+    // load bin/AnimeInfo*.bin to *CGAnimeInfo
+    void LoadAnimeInfo();
+    
+    // load bin/Anime*.bin to CGAnimeData
+    void LoadAnimeData(uint32 AnimeId);
 
     // load bin/Graphic*_Info.bin to *CGInfo
     void LoadGraphicInfo();
