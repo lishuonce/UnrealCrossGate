@@ -75,6 +75,7 @@ DerivedDataCache/*
 
 # Original Assets of CrossGate
 Content/CGRaw
+Content/CGRawDecode
 
 # gitignore_global
 # add to the .gitignore_global
