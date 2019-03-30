@@ -5,6 +5,8 @@
 #include "HAL/PlatformFilemanager.h"
 #include "GenericPlatform/GenericPlatformFile.h"
 #include "ImageUtils.h"
+#include "PaperTileMap.h"
+#include "AssetRegistryModule.h"
 
 DEFINE_LOG_CATEGORY_STATIC(CGGraphicDecoder, Warning, Warning);
 
@@ -32,6 +34,9 @@ FCGGraphicDecoder::FCGGraphicDecoder()
 	// set transparent color
 	alpha_index = 0x00;
 	alpha_level = 0x00;
+    
+    //
+    Test();
 }
 
 FCGGraphicDecoder::~FCGGraphicDecoder()
@@ -42,16 +47,7 @@ FCGGraphicDecoder::~FCGGraphicDecoder()
 
 UTexture2D * FCGGraphicDecoder::GetTexture2D(uint32 GraphicId, FString PaletType)
 {
-    LoadGraphicData(GraphicId);
-    
-    if (CGData.gIscompressed)
-    {
-        DecodeGraphicData();
-    }
-    
-    FormatGraphicData();
-    
-    SetColorBuff(PaletType);
+    SetColorBuff(GraphicId, PaletType);
     
 	// create Texture2D
     UTexture2D *Tex2d = UTexture2D::CreateTransient(CGData.gWidth, CGData.gHeight, PF_B8G8R8A8);
@@ -61,10 +57,7 @@ UTexture2D * FCGGraphicDecoder::GetTexture2D(uint32 GraphicId, FString PaletType
     Mip.BulkData.Unlock();
     Tex2d->UpdateResource();
     
-    // gc SGData.gData , ColorBuff
-    delete[] CGData.gData;
-    CGData.gData = nullptr;
-    
+    // gc ColorBuff
     delete[] ColorBuff;
     ColorBuff = nullptr;
     
@@ -73,16 +66,7 @@ UTexture2D * FCGGraphicDecoder::GetTexture2D(uint32 GraphicId, FString PaletType
 
 void FCGGraphicDecoder::SaveToPng(uint32 GraphicId, FString PaletType)
 {
-	LoadGraphicData(GraphicId);
-
-	if (CGData.gIscompressed)
-	{
-		DecodeGraphicData();
-	}
-
-	FormatGraphicData();
-
-	SetColorBuff(PaletType);
+	SetColorBuff(GraphicId, PaletType);
 
 	// create png array
 	TArray<FColor> SrcData;
@@ -102,26 +86,14 @@ void FCGGraphicDecoder::SaveToPng(uint32 GraphicId, FString PaletType)
 		delete fileHandleTmp;
 	}
 
-	// gc SGData.gData , ColorBuff
-	delete[] CGData.gData;
-	CGData.gData = nullptr;
-
+	// gc ColorBuff
 	delete[] ColorBuff;
 	ColorBuff = nullptr;
 }
 
-void FCGGraphicDecoder::SaveMapToPng(uint32 GraphicId, FString PaletType)
+void FCGGraphicDecoder::SaveTileToPng(uint32 GraphicId, FString PaletType)
 {
-	LoadGraphicData(GraphicId);
-
-	if (CGData.gIscompressed)
-	{
-		DecodeGraphicData();
-	}
-
-	FormatGraphicData();
-
-	SetColorBuff(PaletType);
+	SetColorBuff(GraphicId, PaletType);
 
 	// create png array
 	TArray<FColor> SrcData;
@@ -135,7 +107,7 @@ void FCGGraphicDecoder::SaveMapToPng(uint32 GraphicId, FString PaletType)
 	{
 		fsTexturePath = FPaths::ProjectContentDir() + "CGRawDecode/MapTilesNonStd/";
 	}
-	FString fsTmpPngPath = fsTexturePath + FString::FromInt(CGInfo[GraphicId].gMapId) + ".png";// Filename : MapId
+	FString fsTmpPngPath = fsTexturePath + FString::FromInt(CGInfo[GraphicId].gTileId) + ".png";// Filename : MapId
 	IPlatformFile &platFormFile = FPlatformFileManager::Get().GetPlatformFile();
 	IFileHandle *fileHandleTmp = platFormFile.OpenWrite(*fsTmpPngPath);
 	if (fileHandleTmp)
@@ -144,12 +116,37 @@ void FCGGraphicDecoder::SaveMapToPng(uint32 GraphicId, FString PaletType)
 		delete fileHandleTmp;
 	}
 
-	// gc SGData.gData , ColorBuff
-	delete[] CGData.gData;
-	CGData.gData = nullptr;
-
+	// gc ColorBuff
 	delete[] ColorBuff;
 	ColorBuff = nullptr;
+}
+
+void FCGGraphicDecoder::CreateTileMap(uint32 MapId)
+{
+    // create package
+    FString PackageName = FString::FromInt(MapId);
+    FString PackagePath = "/Game/Maps/" + PackageName;
+    UPackage * Package = CreatePackage(nullptr, *PackagePath);
+    EObjectFlags Flags = RF_Public|RF_Standalone;
+    UPaperTileMap* TileMap = NewObject<UPaperTileMap>(Package, *PackageName, Flags);
+    
+    // set map data - base
+    SetMapData(MapId);
+    TileMap->MapWidth = CGMap.mWeight;
+    TileMap->MapHeight = CGMap.mHeight;
+    TileMap->TileWidth = 64;
+    TileMap->TileHeight = 47;
+    TileMap->ProjectionMode = ETileMapProjectionMode::IsometricDiamond;
+    TileMap->TileLayers.Empty();
+    
+    // register package
+    FAssetRegistryModule::AssetCreated(TileMap);
+    Package->MarkPackageDirty();
+    
+    // save package
+    FString FilePath = FPaths::ProjectContentDir() + "Maps/";
+    FString FileName = FilePath + PackageName + FPackageName::GetAssetPackageExtension();
+    bool bSuccess = UPackage::SavePackage(Package, TileMap, Flags, *FileName);
 }
 
 void FCGGraphicDecoder::SetResPath()
@@ -200,7 +197,7 @@ void FCGGraphicDecoder::LoadMapList()
 	}
 }
 
-void FCGGraphicDecoder::LoadMapData(uint32 MapId)
+void FCGGraphicDecoder::SetMapData(uint32 MapId)
 {
 	// Set fsMapPath
 	FString fsMapPath = fsResPath + "map/0/";
@@ -249,7 +246,7 @@ void FCGGraphicDecoder::LoadAnimeInfo()
     }
 }
 
-void FCGGraphicDecoder::LoadAnimeData(uint32 AnimeId)
+void FCGGraphicDecoder::SetAnimeData(uint32 AnimeId)
 {
     IPlatformFile &PlatFormFile = FPlatformFileManager::Get().GetPlatformFile();
     IFileHandle *fileHandleTmp = PlatFormFile.OpenRead(*fsAnimeDataPath);
@@ -278,6 +275,15 @@ void FCGGraphicDecoder::LoadGraphicInfo()
         CGInfo = new GraphicInfo[iRecordNum];
         fileHandleTmp->Read((uint8 *)CGInfo, iFileSize);
         delete fileHandleTmp;
+        
+        for (uint32 i=0; i<iRecordNum; i++)
+        {
+            if (CGInfo[i].gTileId != 0)
+            {
+                CGTileInfo.Emplace(CGInfo[i].gTileId, CGInfo[i].gId);
+            }
+        }
+        CGTileInfo.KeySort([](uint32 A, uint32 B) {return A < B;});
     }
 }
 
@@ -336,7 +342,7 @@ void FCGGraphicDecoder::InitGraphicData()
     FileHandle = PlatFormFile.OpenRead(*fsGraphicDataPath);
 }
 
-void FCGGraphicDecoder::LoadGraphicData(uint32 GraphicId)
+void FCGGraphicDecoder::SetGraphicData(uint32 GraphicId)
 {
 	if (FileHandle)
 	{
@@ -476,8 +482,17 @@ void FCGGraphicDecoder::FormatGraphicData()
     BufferFormated = nullptr;
 }
 
-void FCGGraphicDecoder::SetColorBuff(FString PaletType)
+void FCGGraphicDecoder::SetColorBuff(uint32 GraphicId, FString PaletType)
 {
+    SetGraphicData(GraphicId);
+    
+    if (CGData.gIscompressed)
+    {
+        DecodeGraphicData();
+    }
+    
+    FormatGraphicData();
+    
 	ColorBuff = new FColor[CGData.gLength];
 	for (uint32 i = 0; i < CGData.gLength; i++)
 	{
@@ -493,4 +508,109 @@ void FCGGraphicDecoder::SetColorBuff(FString PaletType)
             ColorBuff[i].A = 0xff;
         }
 	}
+    
+    // gc SGData.gData
+    delete[] CGData.gData;
+    CGData.gData = nullptr;
+}
+
+void FCGGraphicDecoder::Test()
+{
+//    TArray<uint32> tileidarr;
+//    CGTileInfo.GenerateKeyArray(tileidarr);
+//    uint32 tilenum = CGTileInfo.Num();
+//    UE_LOG(LogTemp, Warning, TEXT("num:%d, max:%d"), tilenum, tileidarr[tilenum-1]);
+    
+//    for (auto &Key : MapList)
+//    {
+//        SetMapData(Key);
+//        uint32 Length = CGMap.mWeight * CGMap.mHeight;
+//        uint32 countstd = 0;
+//        uint32 countnonstd = 0;
+//        uint32 count0 = 0;
+//        uint32 count2 = 0;
+//        for (uint32 i = 0; i < Length; i++)
+//        {
+//            uint16 TileId = CGMap.mArtifactLayer[i];
+//            if (CGTileInfo.Contains(TileId))
+//            {
+//                uint32 gId = CGTileInfo[TileId];
+//                if (CGInfo[gId].gIsNonStd)
+//                {
+//                    //UE_LOG(LogTemp, Warning, TEXT("w:%d h:%d x:%d y:%d"), CGInfo[gId].gWidth, CGInfo[gId].gHeight, CGInfo[gId].gOffsetX, CGInfo[gId].gOffsetY);
+//                    countnonstd++;
+//                }
+//                else
+//                {
+//                    countstd++;
+//                }
+//            }
+//            else if (TileId == 0)
+//            {
+//                count0++;
+//            }
+//            else if (TileId == 2)
+//            {
+//                count2++;
+//            }
+//        }
+//        UE_LOG(LogTemp, Warning, TEXT("map:%d std:%d n:%d 0:%d 2:%d l:%d"), Key, countstd, countnonstd, count0, count2, Length);
+//        delete[] CGMap.mTerrainLayer;
+//        delete[] CGMap.mArtifactLayer;
+//        delete[] CGMap.mFlagLayer;
+//    }
+    
+//    for (auto &Key : MapList)
+//    {
+//        SetMapData(Key);
+//        uint32 Length = CGMap.mWeight * CGMap.mHeight;
+//        uint32 counttransit = 0;
+//        uint32 countnotransit = 0;
+//        uint32 countpass = 0;
+//        uint32 countnopass = 0;
+//        uint32 countnomap = 0;
+//        uint32 countoutt = 0;
+//        uint32 countoutp = 0;
+//        for (uint32 i = 0; i < Length; i++)
+//        {
+//            MapFlag Flag = CGMap.mFlagLayer[i];
+//
+//            switch (Flag.fTransit)
+//            {
+//                case 0:
+//                    countnotransit++;
+//                    break;
+//                case 10:
+//                    counttransit++;
+//                    break;
+//                default:
+//                    countoutt++;
+//                    UE_LOG(LogTemp, Warning, TEXT("%d"), Flag.fTransit);
+//                    break;
+//            }
+//
+//            switch (Flag.fPass)
+//            {
+//                case 0:
+//                    countnomap++;
+//                    break;
+//                case 192:
+//                    countpass++;
+//                    break;
+//                case 193:
+//                    countnopass++;
+//                    break;
+//                default:
+//                    countoutp++;
+//                    break;
+//            }
+//        }
+//        //UE_LOG(LogTemp, Warning, TEXT("map:%d notransit:%d transit:%d o:%d nomap:%d pass:%d nopass:%d o:%d"), Key, countnotransit, counttransit, countoutt, countnomap, countpass, countnopass, countoutp);
+//        delete[] CGMap.mTerrainLayer;
+//        delete[] CGMap.mArtifactLayer;
+//        delete[] CGMap.mFlagLayer;
+//    }
+    
+    CreateTileMap(1000);
+    
 }

@@ -9,7 +9,7 @@ public class UnrealCrossGate : ModuleRules
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
         bEnforceIWYU = true;
 	
-		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "Paper2D", "UMG"});
+		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "Paper2D", "UMG", "AssetRegistry"});
 
 		PrivateDependencyModuleNames.AddRange(new string[] {  });
         
