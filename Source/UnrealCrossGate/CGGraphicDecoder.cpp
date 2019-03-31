@@ -5,8 +5,11 @@
 #include "HAL/PlatformFilemanager.h"
 #include "GenericPlatform/GenericPlatformFile.h"
 #include "ImageUtils.h"
+#include "PaperTileSet.h"
 #include "PaperTileMap.h"
+#include "Modules/ModuleManager.h"
 #include "AssetRegistryModule.h"
+#include "Math/UnrealMathUtility.h"
 
 DEFINE_LOG_CATEGORY_STATIC(CGGraphicDecoder, Warning, Warning);
 
@@ -93,32 +96,35 @@ void FCGGraphicDecoder::SaveToPng(uint32 GraphicId, FString PaletType)
 
 void FCGGraphicDecoder::SaveTileToPng(uint32 GraphicId, FString PaletType)
 {
-	SetColorBuff(GraphicId, PaletType);
-
-	// create png array
-	TArray<FColor> SrcData;
-	SrcData.Append(ColorBuff, CGData.gLength);
-	TArray<uint8> DstData;
-	FImageUtils::CompressImageArray(CGData.gWidth, CGData.gHeight, SrcData, DstData);
-
-	// save png file
-	FString fsTexturePath = FPaths::ProjectContentDir() + "CGRawDecode/MapTiles/";
-	if (CGInfo[GraphicId].gWidth != 64 || CGInfo[GraphicId].gHeight != 47)
+	if (CGTileInfo.Contains(GraphicId))
 	{
-		fsTexturePath = FPaths::ProjectContentDir() + "CGRawDecode/MapTilesNonStd/";
-	}
-	FString fsTmpPngPath = fsTexturePath + FString::FromInt(CGInfo[GraphicId].gTileId) + ".png";// Filename : MapId
-	IPlatformFile &platFormFile = FPlatformFileManager::Get().GetPlatformFile();
-	IFileHandle *fileHandleTmp = platFormFile.OpenWrite(*fsTmpPngPath);
-	if (fileHandleTmp)
-	{
-		fileHandleTmp->Write(DstData.GetData(), DstData.Num());
-		delete fileHandleTmp;
-	}
+		SetColorBuff(GraphicId, PaletType);
 
-	// gc ColorBuff
-	delete[] ColorBuff;
-	ColorBuff = nullptr;
+		// create png array
+		TArray<FColor> SrcData;
+		SrcData.Append(ColorBuff, CGData.gLength);
+		TArray<uint8> DstData;
+		FImageUtils::CompressImageArray(CGData.gWidth, CGData.gHeight, SrcData, DstData);
+
+		// save png file
+		FString fsTexturePath = FPaths::ProjectContentDir() + "CGRawDecode/MapTilesNonStd/";
+		if (CGInfo[GraphicId].gWidth == 64 && CGInfo[GraphicId].gHeight == 47)
+		{
+			fsTexturePath = FPaths::ProjectContentDir() + "CGRawDecode/MapTiles/";
+		}
+		FString fsTmpPngPath = fsTexturePath + FString::FromInt(CGInfo[GraphicId].gId) + ".png";// Filename : gid
+		IPlatformFile &platFormFile = FPlatformFileManager::Get().GetPlatformFile();
+		IFileHandle *fileHandleTmp = platFormFile.OpenWrite(*fsTmpPngPath);
+		if (fileHandleTmp)
+		{
+			fileHandleTmp->Write(DstData.GetData(), DstData.Num());
+			delete fileHandleTmp;
+		}
+
+		// gc ColorBuff
+		delete[] ColorBuff;
+		ColorBuff = nullptr;
+	}
 }
 
 void FCGGraphicDecoder::CreateTileMap(uint32 MapId)
@@ -127,7 +133,7 @@ void FCGGraphicDecoder::CreateTileMap(uint32 MapId)
     FString PackageName = FString::FromInt(MapId);
     FString PackagePath = "/Game/Maps/" + PackageName;
     UPackage * Package = CreatePackage(nullptr, *PackagePath);
-    EObjectFlags Flags = RF_Public|RF_Standalone;
+    EObjectFlags Flags = RF_Public|RF_Standalone|RF_Transactional;
     UPaperTileMap* TileMap = NewObject<UPaperTileMap>(Package, *PackageName, Flags);
     
     // set map data - base
@@ -139,14 +145,16 @@ void FCGGraphicDecoder::CreateTileMap(uint32 MapId)
     TileMap->ProjectionMode = ETileMapProjectionMode::IsometricDiamond;
     TileMap->TileLayers.Empty();
     
-    // register package
-    FAssetRegistryModule::AssetCreated(TileMap);
-    Package->MarkPackageDirty();
-    
+	// set map data - mTerrainLayer
+
+
+
     // save package
+	Package->MarkPackageDirty();
     FString FilePath = FPaths::ProjectContentDir() + "Maps/";
     FString FileName = FilePath + PackageName + FPackageName::GetAssetPackageExtension();
     bool bSuccess = UPackage::SavePackage(Package, TileMap, Flags, *FileName);
+
 }
 
 void FCGGraphicDecoder::SetResPath()
@@ -270,12 +278,14 @@ void FCGGraphicDecoder::LoadGraphicInfo()
     IFileHandle *fileHandleTmp = PlatFormFile.OpenRead(*fsGraphicInfoPath);
     if (fileHandleTmp)
     {
+		// load CGInfo
         uint32 iFileSize = fileHandleTmp->Size();
         uint32 iRecordNum = iFileSize / sizeof(GraphicInfo);
         CGInfo = new GraphicInfo[iRecordNum];
         fileHandleTmp->Read((uint8 *)CGInfo, iFileSize);
         delete fileHandleTmp;
         
+		// set CGTileInfo
         for (uint32 i=0; i<iRecordNum; i++)
         {
             if (CGInfo[i].gTileId != 0)
@@ -285,6 +295,37 @@ void FCGGraphicDecoder::LoadGraphicInfo()
         }
         CGTileInfo.KeySort([](uint32 A, uint32 B) {return A < B;});
     }
+
+	// load tilesets
+	FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
+	TArray<FAssetData> AssetData;
+	FARFilter Filter;
+	Filter.ClassNames.Add(UPaperTileSet::StaticClass()->GetFName());
+	Filter.PackagePaths.Add("/Game/Maps/TileSets");
+	AssetRegistryModule.Get().GetAssets(Filter, AssetData);
+
+	// set CGTileInfoStd
+	uint32 gIdStd = 0;
+	for (auto& Elem : CGTileInfo)
+	{
+		if (CGInfo[Elem.Value].gWidth == 64 && CGInfo[Elem.Value].gHeight == 47)
+		{
+			UPaperTileSet *FirstTileSet = (UPaperTileSet *)AssetData[0].GetAsset();
+			uint32 TileSetCount = FirstTileSet->GetTileCount();
+
+
+			uint32 AssetIndex = FMath::DivideAndRoundDown(gIdStd, TileSetCount);
+			uint32 AssetCount = gIdStd % TileSetCount;
+
+			struct FPaperTileInfo TileInfo;
+			TileInfo.TileSet = (UPaperTileSet *)AssetData[AssetIndex].GetAsset();
+			TileInfo.PackedTileIndex = AssetCount;
+
+			CGTileInfoStd.Emplace(Elem.Key, TileInfo);
+
+			gIdStd++;
+		}
+	}
 }
 
 void FCGGraphicDecoder::LoadPaletData()
@@ -611,6 +652,6 @@ void FCGGraphicDecoder::Test()
 //        delete[] CGMap.mFlagLayer;
 //    }
     
-    CreateTileMap(1000);
+    //CreateTileMap(1000);
     
 }

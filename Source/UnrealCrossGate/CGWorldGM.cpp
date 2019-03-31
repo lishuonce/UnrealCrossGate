@@ -25,8 +25,12 @@ void ACGWorldGM::BeginPlay()
         CGGraphicDecoderSingle.SaveToPng(i, "00");
     }*/
 
-	/*for (uint32 i = 0; i <= 7425; i++) {
-		CGGraphicDecoderSingle.SaveMapToPng(i);
+	/*for (uint32 i = 0; i <= 13371; i++) {
+		CGGraphicDecoderSingle.SaveTileToPng(i);
+	}*/
+
+	/*for (uint32 i = 250496; i <= 256331; i++) {
+		CGGraphicDecoderSingle.SaveTileToPng(i);
 	}*/
 
     /*TArray<FString> &PaletMapKey = CGGraphicDecoderSingle.PaletTypes;

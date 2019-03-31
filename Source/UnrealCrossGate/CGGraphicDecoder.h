@@ -3,6 +3,7 @@
 #pragma once
 #include "CoreMinimal.h"
 #include "Engine/Texture2D.h"
+#include "PaperTileLayer.h"
 
 /**
  * Date: March 2, 2019
@@ -168,7 +169,8 @@ private:
     AnimeInfo * CGAnimeInfo;
     GraphicInfo * CGInfo;
     TMap<uint32, uint32> CGTileInfo;// gTileId, gId
-    
+	TMap<uint32, struct FPaperTileInfo> CGTileInfoStd;// TileId, TileInfo - TODO: should be save as config for runtime gameplay and update when the tile assets update
+
     // runtime set
     AnimeData CGAnimeData;
     GraphicData CGData;
