@@ -26,7 +26,7 @@ FCGGraphicDecoder::FCGGraphicDecoder()
     {
 		LoadMapList();
         LoadAnimeTable(V_0);
-		LoadAnimeTable(V_Ex);
+        LoadAnimeTable(V_Ex);
 		LoadGraphicInfo(V_0);
 		LoadGraphicInfo(V_Ex);
         LoadPaletData();
@@ -282,8 +282,8 @@ void FCGGraphicDecoder::LoadAnimeTable(AssetVer Ver)
 				for (uint32 j = 0; j < CGAsset[Ver].AnimeTable[ActionId].aNum; j++)//j: movement num
 				{
 					// Load Anime_*.bin Header
-					fileHandleTmp2->Seek(pAnimeInfo[ActionId].aAddr);
-					fileHandleTmp2->Read((uint8 *)&CGAsset[Ver].AnimeTable[ActionId].aMovement[j], 12);
+					fileHandleTmp2->Seek(pAnimeInfo[i].aAddr);
+					fileHandleTmp2->Read((uint8 *)&(CGAsset[Ver].AnimeTable[ActionId].aMovement[j]), 12);
 
 					CGAsset[Ver].AnimeTable[ActionId].aMovement[j].gId = new uint32[CGAsset[Ver].AnimeTable[ActionId].aMovement[j].aFrameNum];
 
