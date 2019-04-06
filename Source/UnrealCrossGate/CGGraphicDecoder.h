@@ -3,7 +3,6 @@
 #pragma once
 #include "CoreMinimal.h"
 #include "Engine/Texture2D.h"
-#include "PaperTileLayer.h"
 
 /**
  * Date: March 2, 2019
@@ -42,6 +41,7 @@ private:
 		/* gIsNonStd
          * 0=Std:gWidth=64&gHeight=47&gOffsetX=-32&gOffsetY=-24
          * 1=NonStd
+		 * not worked
          */
         uint8 gIsNonStd;
         uint8 IsReserved[4];
@@ -150,7 +150,7 @@ private:
     // struct of bin/Anime_*.bin
     struct AnimeFrame
     {
-        uint32 pId;
+        uint32 gId;
         uint8 unknown[6];
     };
     struct AnimeData
@@ -161,24 +161,68 @@ private:
         uint32 aFrameNum;
         AnimeFrame *FrameData;// (byte)length = aFrameNum * 10
     };
+
+	struct Movement
+	{
+		uint16 aDirctionId;// 0~7
+		uint16 aMovementId;
+		uint32 aDuration;// unit: ms
+		uint32 aFrameNum;
+		uint32 * gId;
+	};
+
+	struct AnimeTable
+	{
+		uint16 aNum;
+		Movement * aMovement;
+	};
     
     // init load
 	uint8 alpha_index;
 	uint8 alpha_level;// 0x00:transparent 0xff:non-transparent
 	TMap<FString, PaletData> CGPalet;
-    AnimeInfo * CGAnimeInfo;
-    GraphicInfo * CGInfo;
-    TMap<uint32, uint32> CGTileInfo;// gTileId, gId
-	TMap<uint32, struct FPaperTileInfo> CGTileInfoStd;// TileId, TileInfo - TODO: should be save as config for runtime gameplay and update when the tile assets update
 
     // runtime set
-    AnimeData CGAnimeData;
-    GraphicData CGData;
-    GraphicMap CGMap;
+    GraphicMap CurMap;
+	GraphicData CurGraphicData;
     FColor * ColorBuff;
-    
-    IFileHandle *FileHandle;
-	FString fsResPath, fsGraphicInfoPath, fsGraphicDataPath, fsAnimeInfoPath, fsAnimeDataPath;
+
+public:
+
+	// Asset
+	enum AssetVer
+	{
+		V_0,
+		V_Ex
+	};
+
+private:
+
+	enum AssetType
+	{
+		T_GraphicInfo,
+		T_GraphicData,
+		T_AnimeInfo,
+		T_AnimeData
+	};
+
+	struct TileData
+	{
+		uint32 gId;//GraphicInfo.gId
+		uint32 TileSetId;//tileset file id
+		uint32 TileSetIndex;//index in tileset
+	};
+
+	struct AssetInfo
+	{
+		TMap<AssetType, FString> Path;
+		GraphicInfo * GraphicInfo;
+		AnimeTable * AnimeTable;
+		TMap<uint32, TileData> TileInfo;
+		IFileHandle * FileHandle;
+	};
+	
+	TMap<AssetVer, AssetInfo> CGAsset;
     
 public:
     
@@ -195,9 +239,9 @@ public:
     FCGGraphicDecoder(FCGGraphicDecoder const&) = delete;
     void operator=(FCGGraphicDecoder const&) = delete;
     
-	UTexture2D * GetTexture2D(uint32 GraphicId, FString PaletType);
-	void SaveToPng(uint32 GraphicId, FString PaletType);
-	void SaveTileToPng(uint32 GraphicId, FString PaletType = "00");
+	UTexture2D * GetTexture2D(uint32 GraphicId, FString PaletType, AssetVer Ver);
+	void SaveToPng(uint32 GraphicId, FString PaletType, AssetVer Ver);
+	void SaveTileToPng(uint32 GraphicId, FString PaletType, AssetVer Ver);
     
     void CreateTileMap(uint32 MapId);
     
@@ -212,34 +256,31 @@ private:
     // load map/*.dat to MapList
 	void LoadMapList();
 
-	// set map/*.dat to CGMap
+	// set map/*.dat to CurMap
 	void SetMapData(uint32 MapId);
     
-    // load bin/AnimeInfo*.bin to *CGAnimeInfo
-    void LoadAnimeInfo();
-    
-    // set bin/Anime*.bin to CGAnimeData
-    void SetAnimeData(uint32 AnimeId);
+    // load bin/AnimeInfo*.bin Anime*.bin
+	void LoadAnimeTable(AssetVer Ver);
 
-    // load bin/Graphic*_Info.bin to *CGInfo
-    void LoadGraphicInfo();
+    // load bin/Graphic*_Info.bin
+    void LoadGraphicInfo(AssetVer Ver);
 
     // load bin/pal/palet_*.cgp to TMap<FString, Palet> CGPalet
     void LoadPaletData();
 
-    // init filehandle for bin/Graphic*.bin
-    void InitGraphicData();
+    // init filehandle for bin/Graphic*.bin // todo : save filehandle to cgasset
+    void InitGraphicData(AssetVer Ver);
 
-    // set bin/Graphic*.bin to CGData by GraphicId
-    void SetGraphicData(uint32 GraphicId);
+    // set bin/Graphic*.bin to CurData
+    void SetGraphicData(uint32 GraphicId, AssetVer Ver);
 
-    // if GraphicData is compressed, decode(JSS-RLE) SGData.gData
+    // if GraphicData is compressed, decode(JSS-RLE) CurGraphicData.gData
     void DecodeGraphicData();
     
     // format GraphicData from Down-Left to Top-Left
     void FormatGraphicData();
 
     // set ColorBuff by PaletType
-    void SetColorBuff(uint32 GraphicId, FString PaletType);
+    void SetColorBuff(uint32 GraphicId, FString PaletType, AssetVer Ver);
     
 };

@@ -25,10 +25,13 @@ FCGGraphicDecoder::FCGGraphicDecoder()
     if (IsResVerified())
     {
 		LoadMapList();
-        LoadAnimeInfo();
-		LoadGraphicInfo();
+        LoadAnimeTable(V_0);
+		LoadAnimeTable(V_Ex);
+		LoadGraphicInfo(V_0);
+		LoadGraphicInfo(V_Ex);
         LoadPaletData();
-        InitGraphicData();
+        InitGraphicData(V_0);
+		InitGraphicData(V_Ex);
     }
     else
     {
@@ -48,15 +51,15 @@ FCGGraphicDecoder::~FCGGraphicDecoder()
     // dont implement
 }
 
-UTexture2D * FCGGraphicDecoder::GetTexture2D(uint32 GraphicId, FString PaletType)
+UTexture2D * FCGGraphicDecoder::GetTexture2D(uint32 GraphicId, FString PaletType, AssetVer Ver)
 {
-    SetColorBuff(GraphicId, PaletType);
+    SetColorBuff(GraphicId, PaletType, Ver);
     
 	// create Texture2D
-    UTexture2D *Tex2d = UTexture2D::CreateTransient(CGData.gWidth, CGData.gHeight, PF_B8G8R8A8);
+    UTexture2D *Tex2d = UTexture2D::CreateTransient(CurGraphicData.gWidth, CurGraphicData.gHeight, PF_B8G8R8A8);
     FTexture2DMipMap& Mip = Tex2d->PlatformData->Mips[0];
     void* Data = Mip.BulkData.Lock(LOCK_READ_WRITE);
-    FMemory::Memcpy(Data, ColorBuff, CGData.gLength * sizeof(FColor));
+    FMemory::Memcpy(Data, ColorBuff, CurGraphicData.gLength * sizeof(FColor));
     Mip.BulkData.Unlock();
     Tex2d->UpdateResource();
     
@@ -67,15 +70,15 @@ UTexture2D * FCGGraphicDecoder::GetTexture2D(uint32 GraphicId, FString PaletType
     return Tex2d;
 }
 
-void FCGGraphicDecoder::SaveToPng(uint32 GraphicId, FString PaletType)
+void FCGGraphicDecoder::SaveToPng(uint32 GraphicId, FString PaletType, AssetVer Ver)
 {
-	SetColorBuff(GraphicId, PaletType);
+	SetColorBuff(GraphicId, PaletType, Ver);
 
 	// create png array
 	TArray<FColor> SrcData;
-	SrcData.Append(ColorBuff, CGData.gLength);
+	SrcData.Append(ColorBuff, CurGraphicData.gLength);
 	TArray<uint8> DstData;
-	FImageUtils::CompressImageArray(CGData.gWidth, CGData.gHeight, SrcData, DstData);
+	FImageUtils::CompressImageArray(CurGraphicData.gWidth, CurGraphicData.gHeight, SrcData, DstData);
 
 	// save png file
 	FString fsTexturePath = FPaths::ProjectContentDir() + "CGRawDecode/MapTiles/";
@@ -94,25 +97,25 @@ void FCGGraphicDecoder::SaveToPng(uint32 GraphicId, FString PaletType)
 	ColorBuff = nullptr;
 }
 
-void FCGGraphicDecoder::SaveTileToPng(uint32 GraphicId, FString PaletType)
+void FCGGraphicDecoder::SaveTileToPng(uint32 GraphicId, FString PaletType, AssetVer Ver)
 {
-	if (CGTileInfo.Contains(GraphicId))
+	if (CGAsset[Ver].TileInfo.Contains(GraphicId))
 	{
-		SetColorBuff(GraphicId, PaletType);
+		SetColorBuff(GraphicId, PaletType, Ver);
 
 		// create png array
 		TArray<FColor> SrcData;
-		SrcData.Append(ColorBuff, CGData.gLength);
+		SrcData.Append(ColorBuff, CurGraphicData.gLength);
 		TArray<uint8> DstData;
-		FImageUtils::CompressImageArray(CGData.gWidth, CGData.gHeight, SrcData, DstData);
+		FImageUtils::CompressImageArray(CurGraphicData.gWidth, CurGraphicData.gHeight, SrcData, DstData);
 
 		// save png file
 		FString fsTexturePath = FPaths::ProjectContentDir() + "CGRawDecode/MapTilesNonStd/";
-		if (CGInfo[GraphicId].gWidth == 64 && CGInfo[GraphicId].gHeight == 47)
+		if (CGAsset[Ver].GraphicInfo[GraphicId].gWidth == 64 && CGAsset[Ver].GraphicInfo[GraphicId].gHeight == 47)
 		{
 			fsTexturePath = FPaths::ProjectContentDir() + "CGRawDecode/MapTiles/";
 		}
-		FString fsTmpPngPath = fsTexturePath + FString::FromInt(CGInfo[GraphicId].gId) + ".png";// Filename : gid
+		FString fsTmpPngPath = fsTexturePath + FString::FromInt(CGAsset[Ver].GraphicInfo[GraphicId].gId) + ".png";// Filename : gid
 		IPlatformFile &platFormFile = FPlatformFileManager::Get().GetPlatformFile();
 		IFileHandle *fileHandleTmp = platFormFile.OpenWrite(*fsTmpPngPath);
 		if (fileHandleTmp)
@@ -138,8 +141,8 @@ void FCGGraphicDecoder::CreateTileMap(uint32 MapId)
     
     // set map data - base
     SetMapData(MapId);
-    TileMap->MapWidth = CGMap.mWeight;
-    TileMap->MapHeight = CGMap.mHeight;
+    TileMap->MapWidth = CurMap.mWeight;
+    TileMap->MapHeight = CurMap.mHeight;
     TileMap->TileWidth = 64;
     TileMap->TileHeight = 47;
     TileMap->ProjectionMode = ETileMapProjectionMode::IsometricDiamond;
@@ -159,13 +162,23 @@ void FCGGraphicDecoder::CreateTileMap(uint32 MapId)
 
 void FCGGraphicDecoder::SetResPath()
 {
-    // todo : check launch dir, if not, let player define
-    fsResPath = FPaths::ProjectContentDir() + "CGRaw/";// CG Raw Assets paths : Content/CGRaw
-    // fsResPath = FPaths::LaunchDir();// CG Raw Assets paths : game launch pach
-    fsGraphicInfoPath = fsResPath + "bin/GraphicInfo_20.bin";
-    fsGraphicDataPath = fsResPath + "bin/Graphic_20.bin";
-    fsAnimeInfoPath = fsResPath + "bin/AnimeInfo_3.bin";
-    fsAnimeDataPath = fsResPath + "bin/Anime_3.bin";
+	FString fsAssetPath = FPaths::ProjectContentDir() + "CGRaw/bin/";
+
+	AssetInfo Asset_V0;
+	CGAsset.Emplace(V_0, Asset_V0);
+
+	CGAsset[V_0].Path.Emplace(T_GraphicInfo, fsAssetPath + "GraphicInfo_20.bin");
+	CGAsset[V_0].Path.Emplace(T_GraphicData, fsAssetPath + "Graphic_20.bin");
+	CGAsset[V_0].Path.Emplace(T_AnimeInfo, fsAssetPath + "AnimeInfo_3.bin");
+	CGAsset[V_0].Path.Emplace(T_AnimeData, fsAssetPath + "Anime_3.bin");
+
+	AssetInfo Asset_Ex;
+	CGAsset.Emplace(V_Ex, Asset_Ex);
+
+	CGAsset[V_Ex].Path.Emplace(T_GraphicInfo, fsAssetPath + "GraphicInfoEx_4.bin");
+	CGAsset[V_Ex].Path.Emplace(T_GraphicData, fsAssetPath + "GraphicEx_4.bin");
+	CGAsset[V_Ex].Path.Emplace(T_AnimeInfo, fsAssetPath + "AnimeInfoEx_1.Bin");
+	CGAsset[V_Ex].Path.Emplace(T_AnimeData, fsAssetPath + "AnimeEx_1.Bin");
 }
 
 bool FCGGraphicDecoder::IsResVerified()
@@ -173,9 +186,7 @@ bool FCGGraphicDecoder::IsResVerified()
     // todo : check file exists
     // todo : check md5
     
-    if (FPaths::FileExists(fsGraphicInfoPath)
-        && FPaths::FileExists(fsGraphicDataPath)
-		)
+    if (true)
     {
         return true;
     }
@@ -188,7 +199,7 @@ bool FCGGraphicDecoder::IsResVerified()
 void FCGGraphicDecoder::LoadMapList()
 {
 	// Set fsMapPath
-	FString fsMapPath = fsResPath + "map/0/";
+	FString fsMapPath = FPaths::ProjectContentDir() + "CGRaw/map/0/";
 	FString fsMapExten = ".dat";
 
 	// Get *.dat to FileList
@@ -208,7 +219,7 @@ void FCGGraphicDecoder::LoadMapList()
 void FCGGraphicDecoder::SetMapData(uint32 MapId)
 {
 	// Set fsMapPath
-	FString fsMapPath = fsResPath + "map/0/";
+	FString fsMapPath = FPaths::ProjectContentDir() + "CGRaw/map/0/";
 	FString fsMapExten = ".dat";
 	FString fsMapName = FString::FromInt(MapId);
 	FString fsMapFile = fsMapPath + fsMapName + fsMapExten;
@@ -219,113 +230,144 @@ void FCGGraphicDecoder::SetMapData(uint32 MapId)
 	if (fileHandleTmp)
 	{
 		// Load GraphicMap Header : mHeader[3], mBlank[9], mWeight, mHeight
-		fileHandleTmp->Read((uint8 *)&CGMap, 20);
+		fileHandleTmp->Read((uint8 *)&CurMap, 20);
 
-		uint32 LayerLength = CGMap.mWeight * CGMap.mHeight;
+		uint32 LayerLength = CurMap.mWeight * CurMap.mHeight;
         uint32 LayerSize = LayerLength * 2;
 
 		// Load GraphicMap Layet : mTerrainLayer
-		CGMap.mTerrainLayer = new uint16[LayerLength];
-		fileHandleTmp->Read((uint8 *)CGMap.mTerrainLayer, LayerSize);
+		CurMap.mTerrainLayer = new uint16[LayerLength];
+		fileHandleTmp->Read((uint8 *)CurMap.mTerrainLayer, LayerSize);
 
 		// Load GraphicMap Layet : mArtifactLayer
-		CGMap.mArtifactLayer = new uint16[LayerLength];
-		fileHandleTmp->Read((uint8 *)CGMap.mArtifactLayer, LayerSize);
+		CurMap.mArtifactLayer = new uint16[LayerLength];
+		fileHandleTmp->Read((uint8 *)CurMap.mArtifactLayer, LayerSize);
 
 		// Load GraphicMap Layet : mFlagLayer
-		CGMap.mFlagLayer = new MapFlag[LayerLength];
-		fileHandleTmp->Read((uint8 *)CGMap.mFlagLayer, LayerSize);
+		CurMap.mFlagLayer = new MapFlag[LayerLength];
+		fileHandleTmp->Read((uint8 *)CurMap.mFlagLayer, LayerSize);
 
 		delete fileHandleTmp;
 	}
 }
 
-void FCGGraphicDecoder::LoadAnimeInfo()
+void FCGGraphicDecoder::LoadAnimeTable(AssetVer Ver)
 {
+	AnimeInfo *pAnimeInfo;
     IPlatformFile &PlatFormFile = FPlatformFileManager::Get().GetPlatformFile();
-    IFileHandle *fileHandleTmp = PlatFormFile.OpenRead(*fsAnimeInfoPath);
+
+    IFileHandle *fileHandleTmp = PlatFormFile.OpenRead(*CGAsset[Ver].Path[T_AnimeInfo]);
     if (fileHandleTmp)
     {
         uint32 iFileSize = fileHandleTmp->Size();
         uint32 iRecordNum = iFileSize / sizeof(AnimeInfo);
-        CGAnimeInfo = new AnimeInfo[iRecordNum];
-        fileHandleTmp->Read((uint8 *)CGAnimeInfo, iFileSize);
+		pAnimeInfo = new AnimeInfo[iRecordNum];
+        fileHandleTmp->Read((uint8 *)pAnimeInfo, iFileSize);
         delete fileHandleTmp;
-    }
+
+		IFileHandle *fileHandleTmp2 = PlatFormFile.OpenRead(*CGAsset[Ver].Path[T_AnimeData]);
+		if (fileHandleTmp2)
+		{
+			uint32 StartIndex = 2375;
+			CGAsset[Ver].AnimeTable = new AnimeTable[iRecordNum - StartIndex];
+
+			for (uint32 i = StartIndex; i < iRecordNum; i++)
+			{
+				uint32 ActionId = i - StartIndex;
+				
+				// Set AnimeTable
+				CGAsset[Ver].AnimeTable[ActionId].aNum = pAnimeInfo[i].aNum;
+				CGAsset[Ver].AnimeTable[ActionId].aMovement = new Movement[CGAsset[Ver].AnimeTable[ActionId].aNum];
+
+				for (uint32 j = 0; j < CGAsset[Ver].AnimeTable[ActionId].aNum; j++)//j: movement num
+				{
+					// Load Anime_*.bin Header
+					fileHandleTmp2->Seek(pAnimeInfo[ActionId].aAddr);
+					fileHandleTmp2->Read((uint8 *)&CGAsset[Ver].AnimeTable[ActionId].aMovement[j], 12);
+
+					CGAsset[Ver].AnimeTable[ActionId].aMovement[j].gId = new uint32[CGAsset[Ver].AnimeTable[ActionId].aMovement[j].aFrameNum];
+
+					for (uint32 k = 0; k < CGAsset[Ver].AnimeTable[ActionId].aMovement[j].aFrameNum; k++)//k: frame num
+					{
+						AnimeFrame FrameData;
+						
+						// Load Anime_*.bin FrameData
+						uint32 DataSize = CGAsset[Ver].AnimeTable[ActionId].aMovement[j].aFrameNum * sizeof(AnimeFrame);
+						fileHandleTmp2->Read((uint8 *)&FrameData, DataSize);
+
+						CGAsset[Ver].AnimeTable[ActionId].aMovement[j].gId[k] = FrameData.gId;
+					}
+				}
+			}
+			delete fileHandleTmp2;
+		}
+		delete[] pAnimeInfo;
+	}
 }
 
-void FCGGraphicDecoder::SetAnimeData(uint32 AnimeId)
+void FCGGraphicDecoder::LoadGraphicInfo(AssetVer Ver)
 {
     IPlatformFile &PlatFormFile = FPlatformFileManager::Get().GetPlatformFile();
-    IFileHandle *fileHandleTmp = PlatFormFile.OpenRead(*fsAnimeDataPath);
+    IFileHandle *fileHandleTmp = PlatFormFile.OpenRead(*CGAsset[Ver].Path[T_GraphicInfo]);
     if (fileHandleTmp)
     {
-        // Load Anime_*.bin Header
-        FileHandle->Seek(CGAnimeInfo[AnimeId].aAddr);
-        FileHandle->Read((uint8 *)&CGAnimeData, 12);
-        
-        // Load Anime_*.bin FrameData
-        CGAnimeData.FrameData = new AnimeFrame[CGAnimeData.aFrameNum];
-        uint32 DataSize = CGAnimeData.aFrameNum * 10;
-        FileHandle->Read((uint8 *)CGAnimeData.FrameData, DataSize);
-        delete fileHandleTmp;
-    }
-}
-
-void FCGGraphicDecoder::LoadGraphicInfo()
-{
-    IPlatformFile &PlatFormFile = FPlatformFileManager::Get().GetPlatformFile();
-    IFileHandle *fileHandleTmp = PlatFormFile.OpenRead(*fsGraphicInfoPath);
-    if (fileHandleTmp)
-    {
-		// load CGInfo
+		// load CGAsset[Ver].GraphicInfo
         uint32 iFileSize = fileHandleTmp->Size();
         uint32 iRecordNum = iFileSize / sizeof(GraphicInfo);
-        CGInfo = new GraphicInfo[iRecordNum];
-        fileHandleTmp->Read((uint8 *)CGInfo, iFileSize);
+        CGAsset[Ver].GraphicInfo = new GraphicInfo[iRecordNum];
+        fileHandleTmp->Read((uint8 *)CGAsset[Ver].GraphicInfo, iFileSize);
         delete fileHandleTmp;
         
-		// set CGTileInfo
+		// set CGAsset[Ver].TileInfo
+		uint32 TileSetCount = 500;
+		uint32 gIdStd = 0;
         for (uint32 i=0; i<iRecordNum; i++)
         {
-            if (CGInfo[i].gTileId != 0)
+            if (CGAsset[Ver].GraphicInfo[i].gTileId != 0)
             {
-                CGTileInfo.Emplace(CGInfo[i].gTileId, CGInfo[i].gId);
+				TileData TileData = { i, 0, 0 };
+				if (CGAsset[Ver].GraphicInfo[i].gWidth == 64 && CGAsset[Ver].GraphicInfo[i].gHeight == 47)
+				{
+					TileData.TileSetId = FMath::DivideAndRoundDown(gIdStd, TileSetCount);
+					TileData.TileSetIndex = gIdStd % TileSetCount;
+					gIdStd++;
+				}
+				CGAsset[Ver].TileInfo.Emplace(CGAsset[Ver].GraphicInfo[i].gTileId, TileData);
             }
         }
-        CGTileInfo.KeySort([](uint32 A, uint32 B) {return A < B;});
+		CGAsset[Ver].TileInfo.KeySort([](uint32 A, uint32 B) {return A < B;});
     }
 
-	// load tilesets
-	FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
-	TArray<FAssetData> AssetData;
-	FARFilter Filter;
-	Filter.ClassNames.Add(UPaperTileSet::StaticClass()->GetFName());
-	Filter.PackagePaths.Add("/Game/Maps/TileSets");
-	AssetRegistryModule.Get().GetAssets(Filter, AssetData);
+	//// load tilesets
+	//FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
+	//TArray<FAssetData> AssetData;
+	//FARFilter Filter;
+	//Filter.ClassNames.Add(UPaperTileSet::StaticClass()->GetFName());
+	//Filter.PackagePaths.Add("/Game/Maps/TileSets");
+	//AssetRegistryModule.Get().GetAssets(Filter, AssetData);
 
-	// set CGTileInfoStd
-	uint32 gIdStd = 0;
-	for (auto& Elem : CGTileInfo)
-	{
-		if (CGInfo[Elem.Value].gWidth == 64 && CGInfo[Elem.Value].gHeight == 47)
-		{
-			UPaperTileSet *FirstTileSet = (UPaperTileSet *)AssetData[0].GetAsset();
-			uint32 TileSetCount = FirstTileSet->GetTileCount();
+	//// set CGTileInfoStd
+	//uint32 gIdStd = 0;
+	//for (auto& Elem : CGTileInfo)
+	//{
+	//	if (CGAsset[Ver].GraphicInfo[Elem.Value].gWidth == 64 && CGAsset[Ver].GraphicInfo[Elem.Value].gHeight == 47)
+	//	{
+	//		UPaperTileSet *FirstTileSet = (UPaperTileSet *)AssetData[0].GetAsset();
+	//		uint32 TileSetCount = FirstTileSet->GetTileCount();
 
 
-			uint32 AssetIndex = FMath::DivideAndRoundDown(gIdStd, TileSetCount);
-			uint32 AssetCount = gIdStd % TileSetCount;
+	//		uint32 AssetIndex = FMath::DivideAndRoundDown(gIdStd, TileSetCount);
+	//		uint32 AssetCount = gIdStd % TileSetCount;
 
-			struct FPaperTileInfo TileInfo;
-			TileInfo.TileSet = (UPaperTileSet *)AssetData[AssetIndex].GetAsset();
-			TileInfo.PackedTileIndex = AssetCount;
+	//		struct FPaperTileInfo TileInfo;
+	//		TileInfo.TileSet = (UPaperTileSet *)AssetData[AssetIndex].GetAsset();
+	//		TileInfo.PackedTileIndex = AssetCount;
 
-			CGTileInfoStd.Emplace(Elem.Key, TileInfo);
+	//		CGTileInfoStd.Emplace(Elem.Key, TileInfo);
 
-			gIdStd++;
-		}
-	}
+	//		gIdStd++;
+	//	}
+	//}
 }
 
 void FCGGraphicDecoder::LoadPaletData()
@@ -343,7 +385,7 @@ void FCGGraphicDecoder::LoadPaletData()
         0x00, 0x00, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0xFF, 0x80, 0xFF, 0xFF, 0xFF, 0x00, 0xFF, 0xFF, 0xFF};
     
     // Set fsPaletPath
-    FString fsPaletPath = fsResPath + "bin/pal/";
+    FString fsPaletPath = FPaths::ProjectContentDir() + "CGRaw/bin/pal/";
     FString fsPaletExten = ".cgp";
 
 	// Get Palet_*.cgp to FileList
@@ -377,24 +419,24 @@ void FCGGraphicDecoder::LoadPaletData()
     CGPalet.GenerateKeyArray(PaletTypes);
 }
 
-void FCGGraphicDecoder::InitGraphicData()
+void FCGGraphicDecoder::InitGraphicData(AssetVer Ver)
 {
     IPlatformFile &PlatFormFile = FPlatformFileManager::Get().GetPlatformFile();
-    FileHandle = PlatFormFile.OpenRead(*fsGraphicDataPath);
+	CGAsset[Ver].FileHandle = PlatFormFile.OpenRead(*CGAsset[Ver].Path[T_GraphicData]);
 }
 
-void FCGGraphicDecoder::SetGraphicData(uint32 GraphicId)
+void FCGGraphicDecoder::SetGraphicData(uint32 GraphicId, AssetVer Ver)
 {
-	if (FileHandle)
+	if (CGAsset[Ver].FileHandle)
 	{
 		// Load Graphic_*.bin Header
-		FileHandle->Seek(CGInfo[GraphicId].gAddr);
-		FileHandle->Read((uint8 *)&CGData, 16);
+		CGAsset[Ver].FileHandle->Seek(CGAsset[Ver].GraphicInfo[GraphicId].gAddr);
+		CGAsset[Ver].FileHandle->Read((uint8 *)&CurGraphicData, 16);
 
 		// Load Graphic_*.bin gData
-		CGData.gLength -= 16;
-		CGData.gData = new uint8[CGData.gLength];
-		FileHandle->Read(CGData.gData, CGData.gLength);
+		CurGraphicData.gLength -= 16;
+		CurGraphicData.gData = new uint8[CurGraphicData.gLength];
+		CGAsset[Ver].FileHandle->Read(CurGraphicData.gData, CurGraphicData.gLength);
 	}
 }
 
@@ -411,12 +453,12 @@ void FCGGraphicDecoder::DecodeGraphicData()
 
 	uint32 BufferDecodedCursor = 0;
 	uint32 BufferEncodedCursor = 0;
-	uint8 *BufferDecoded = new uint8[CGData.gHeight*CGData.gWidth];
+	uint8 *BufferDecoded = new uint8[CurGraphicData.gHeight*CurGraphicData.gWidth];
 
-	while (BufferEncodedCursor < CGData.gLength)
+	while (BufferEncodedCursor < CurGraphicData.gLength)
 	{
-		uint8 High = CGData.gData[BufferEncodedCursor] >> 4;
-		uint8 Low = CGData.gData[BufferEncodedCursor] & 0x0f;
+		uint8 High = CurGraphicData.gData[BufferEncodedCursor] >> 4;
+		uint8 Low = CurGraphicData.gData[BufferEncodedCursor] & 0x0f;
 		uint32 RLESize = 0;
 		uint8 *RepeatBuffer;
 
@@ -427,11 +469,11 @@ void FCGGraphicDecoder::DecodeGraphicData()
 			ERLEFlags = RLE_READ;
 			break;
 		case 0x1:
-			RLESize = Low * 0x100 + CGData.gData[BufferEncodedCursor + 1];
+			RLESize = Low * 0x100 + CurGraphicData.gData[BufferEncodedCursor + 1];
 			ERLEFlags = RLE_READ;
 			break;
 		case 0x2:
-			RLESize = Low * 0x10000 + CGData.gData[BufferEncodedCursor + 1] * 0x100 + CGData.gData[BufferEncodedCursor + 2];
+			RLESize = Low * 0x10000 + CurGraphicData.gData[BufferEncodedCursor + 1] * 0x100 + CurGraphicData.gData[BufferEncodedCursor + 2];
 			ERLEFlags = RLE_READ;
 			break;
 		case 0x8:
@@ -439,11 +481,11 @@ void FCGGraphicDecoder::DecodeGraphicData()
 			ERLEFlags = RLE_REPEAT_BACKGROUND;
 			break;
 		case 0x9:
-			RLESize = Low * 0x100 + CGData.gData[BufferEncodedCursor + 2];
+			RLESize = Low * 0x100 + CurGraphicData.gData[BufferEncodedCursor + 2];
 			ERLEFlags = RLE_REPEAT_BACKGROUND;
 			break;
 		case 0xa:
-			RLESize = Low * 0x10000 + CGData.gData[BufferEncodedCursor + 2] * 0x100 + CGData.gData[BufferEncodedCursor + 3];
+			RLESize = Low * 0x10000 + CurGraphicData.gData[BufferEncodedCursor + 2] * 0x100 + CurGraphicData.gData[BufferEncodedCursor + 3];
 			ERLEFlags = RLE_REPEAT_BACKGROUND;
 			break;
 		case 0xc:
@@ -451,28 +493,28 @@ void FCGGraphicDecoder::DecodeGraphicData()
 			ERLEFlags = RLE_REPEAT_TRANSPARENT;
 			break;
 		case 0xd:
-			RLESize = Low * 0x100 + CGData.gData[BufferEncodedCursor + 1];
+			RLESize = Low * 0x100 + CurGraphicData.gData[BufferEncodedCursor + 1];
 			ERLEFlags = RLE_REPEAT_TRANSPARENT;
 			break;
 		case 0xe:
-			RLESize = Low * 0x10000 + CGData.gData[BufferEncodedCursor + 1] * 0x100 + CGData.gData[BufferEncodedCursor + 2];
+			RLESize = Low * 0x10000 + CurGraphicData.gData[BufferEncodedCursor + 1] * 0x100 + CurGraphicData.gData[BufferEncodedCursor + 2];
 			ERLEFlags = RLE_REPEAT_TRANSPARENT;
 			break;
 		default:
-			UE_LOG(CGGraphicDecoder, Error, TEXT("JSS-RLE Decode Error - switch(High) Default: %x"), CGData.gData[BufferEncodedCursor]);
+			UE_LOG(CGGraphicDecoder, Error, TEXT("JSS-RLE Decode Error - switch(High) Default: %x"), CurGraphicData.gData[BufferEncodedCursor]);
 			break;
 		}// while switch(High) END
 
 		switch (ERLEFlags)
 		{
 		case RLE_READ:
-			FMemory::Memcpy(&BufferDecoded[BufferDecodedCursor], &CGData.gData[BufferEncodedCursor + High + 1], RLESize);
+			FMemory::Memcpy(&BufferDecoded[BufferDecodedCursor], &CurGraphicData.gData[BufferEncodedCursor + High + 1], RLESize);
 			BufferDecodedCursor += RLESize;
 			BufferEncodedCursor += High + 1 + RLESize;
 			break;
 		case RLE_REPEAT_BACKGROUND:
 			RepeatBuffer = new uint8[RLESize];
-			memset(RepeatBuffer, CGData.gData[BufferEncodedCursor + 1], RLESize);
+			memset(RepeatBuffer, CurGraphicData.gData[BufferEncodedCursor + 1], RLESize);
 			FMemory::Memcpy(&BufferDecoded[BufferDecodedCursor], RepeatBuffer, RLESize);
 			BufferDecodedCursor += RLESize;
 			delete[] RepeatBuffer;
@@ -487,7 +529,7 @@ void FCGGraphicDecoder::DecodeGraphicData()
 			BufferEncodedCursor += (High % 4) + 1;
 			break;
 		default:
-			UE_LOG(CGGraphicDecoder, Error, TEXT("JSS-RLE Decode Error - switch(ERLEFlags) Default: %x"), CGData.gData[BufferEncodedCursor]);
+			UE_LOG(CGGraphicDecoder, Error, TEXT("JSS-RLE Decode Error - switch(ERLEFlags) Default: %x"), CurGraphicData.gData[BufferEncodedCursor]);
 			break;
 		}// switch(ERLEFlags) END
 
@@ -496,51 +538,51 @@ void FCGGraphicDecoder::DecodeGraphicData()
 	}// while CurrentDecodePosition < SizeOfBuffer END
 
 	// update SGData
-	CGData.gIscompressed = 0;
-	CGData.gLength = BufferDecodedCursor;
-	delete[] CGData.gData;
-	CGData.gData = BufferDecoded;
+	CurGraphicData.gIscompressed = 0;
+	CurGraphicData.gLength = BufferDecodedCursor;
+	delete[] CurGraphicData.gData;
+	CurGraphicData.gData = BufferDecoded;
 	BufferDecoded = nullptr;
 }
 
 void FCGGraphicDecoder::FormatGraphicData()
 {
-    uint8 *BufferFormated = new uint8[CGData.gLength];
+    uint8 *BufferFormated = new uint8[CurGraphicData.gLength];
     uint32 Cursor;
     uint32 CursorFormated;
     uint32 LineFormated;
     
-    for (uint32 Line = 0; Line < CGData.gHeight; Line ++)
+    for (uint32 Line = 0; Line < CurGraphicData.gHeight; Line ++)
     {
-        LineFormated = CGData.gHeight - Line - 1;
-        Cursor = Line * CGData.gWidth;
-        CursorFormated = LineFormated * (CGData.gWidth);
-        FMemory::Memcpy(&BufferFormated[CursorFormated], &CGData.gData[Cursor], CGData.gWidth);
+        LineFormated = CurGraphicData.gHeight - Line - 1;
+        Cursor = Line * CurGraphicData.gWidth;
+        CursorFormated = LineFormated * (CurGraphicData.gWidth);
+        FMemory::Memcpy(&BufferFormated[CursorFormated], &CurGraphicData.gData[Cursor], CurGraphicData.gWidth);
     }
     
-    delete[] CGData.gData;
-    CGData.gData = BufferFormated;
+    delete[] CurGraphicData.gData;
+    CurGraphicData.gData = BufferFormated;
     BufferFormated = nullptr;
 }
 
-void FCGGraphicDecoder::SetColorBuff(uint32 GraphicId, FString PaletType)
+void FCGGraphicDecoder::SetColorBuff(uint32 GraphicId, FString PaletType, AssetVer Ver)
 {
-    SetGraphicData(GraphicId);
+    SetGraphicData(GraphicId, Ver);
     
-    if (CGData.gIscompressed)
+    if (CurGraphicData.gIscompressed)
     {
         DecodeGraphicData();
     }
     
     FormatGraphicData();
     
-	ColorBuff = new FColor[CGData.gLength];
-	for (uint32 i = 0; i < CGData.gLength; i++)
+	ColorBuff = new FColor[CurGraphicData.gLength];
+	for (uint32 i = 0; i < CurGraphicData.gLength; i++)
 	{
-		ColorBuff[i].B = CGPalet[PaletType].ColorData[CGData.gData[i]].Blue;
-		ColorBuff[i].G = CGPalet[PaletType].ColorData[CGData.gData[i]].Green;
-		ColorBuff[i].R = CGPalet[PaletType].ColorData[CGData.gData[i]].Red;
-		if (CGData.gData[i] == alpha_index)
+		ColorBuff[i].B = CGPalet[PaletType].ColorData[CurGraphicData.gData[i]].Blue;
+		ColorBuff[i].G = CGPalet[PaletType].ColorData[CurGraphicData.gData[i]].Green;
+		ColorBuff[i].R = CGPalet[PaletType].ColorData[CurGraphicData.gData[i]].Red;
+		if (CurGraphicData.gData[i] == alpha_index)
 		{
 			ColorBuff[i].A = alpha_level;
 		}
@@ -551,8 +593,8 @@ void FCGGraphicDecoder::SetColorBuff(uint32 GraphicId, FString PaletType)
 	}
     
     // gc SGData.gData
-    delete[] CGData.gData;
-    CGData.gData = nullptr;
+    delete[] CurGraphicData.gData;
+    CurGraphicData.gData = nullptr;
 }
 
 void FCGGraphicDecoder::Test()
@@ -576,9 +618,9 @@ void FCGGraphicDecoder::Test()
 //            if (CGTileInfo.Contains(TileId))
 //            {
 //                uint32 gId = CGTileInfo[TileId];
-//                if (CGInfo[gId].gIsNonStd)
+//                if (CGAsset[Ver].GraphicInfo[gId].gIsNonStd)
 //                {
-//                    //UE_LOG(LogTemp, Warning, TEXT("w:%d h:%d x:%d y:%d"), CGInfo[gId].gWidth, CGInfo[gId].gHeight, CGInfo[gId].gOffsetX, CGInfo[gId].gOffsetY);
+//                    //UE_LOG(LogTemp, Warning, TEXT("w:%d h:%d x:%d y:%d"), CGAsset[Ver].GraphicInfo[gId].gWidth, CGAsset[Ver].GraphicInfo[gId].gHeight, CGAsset[Ver].GraphicInfo[gId].gOffsetX, CGAsset[Ver].GraphicInfo[gId].gOffsetY);
 //                    countnonstd++;
 //                }
 //                else
