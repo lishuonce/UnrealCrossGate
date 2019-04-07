@@ -173,6 +173,7 @@ private:
 
 	struct AnimeTable
 	{
+		uint32 aId;
 		uint16 aNum;
 		Movement * aMovement;
 	};

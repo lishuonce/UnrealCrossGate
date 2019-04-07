@@ -276,26 +276,34 @@ void FCGGraphicDecoder::LoadAnimeTable(AssetVer Ver)
 				uint32 ActionId = i - StartIndex;
 				
 				// Set AnimeTable
+				CGAsset[Ver].AnimeTable[ActionId].aId = pAnimeInfo[i].aId;
 				CGAsset[Ver].AnimeTable[ActionId].aNum = pAnimeInfo[i].aNum;
 				CGAsset[Ver].AnimeTable[ActionId].aMovement = new Movement[CGAsset[Ver].AnimeTable[ActionId].aNum];
+
+				UE_LOG(LogTemp, Warning, TEXT("CGAsset[Ver].AnimeTable[ActionId].aId=%d"), CGAsset[Ver].AnimeTable[ActionId].aId);
+				UE_LOG(LogTemp, Warning, TEXT("CGAsset[Ver].AnimeTable[ActionId].aNum=%d"), CGAsset[Ver].AnimeTable[ActionId].aNum);
+
+				// Set Anime_*.bin addr
+				fileHandleTmp2->Seek(pAnimeInfo[i].aAddr);
+				
 
 				for (uint32 j = 0; j < CGAsset[Ver].AnimeTable[ActionId].aNum; j++)//j: movement num
 				{
 					// Load Anime_*.bin Header
-					fileHandleTmp2->Seek(pAnimeInfo[i].aAddr);
-					fileHandleTmp2->Read((uint8 *)&(CGAsset[Ver].AnimeTable[ActionId].aMovement[j]), 12);
+					fileHandleTmp2->Read((uint8 *)&CGAsset[Ver].AnimeTable[ActionId].aMovement[j], 12);
+
+					UE_LOG(LogTemp, Warning, TEXT("CGAsset[Ver].AnimeTable[ActionId].aMovement[j].aDirctionId=%d"), CGAsset[Ver].AnimeTable[ActionId].aMovement[j].aDirctionId);
+					UE_LOG(LogTemp, Warning, TEXT("CGAsset[Ver].AnimeTable[ActionId].aMovement[j].aMovementId=%d"), CGAsset[Ver].AnimeTable[ActionId].aMovement[j].aMovementId);
+					UE_LOG(LogTemp, Warning, TEXT("CGAsset[Ver].AnimeTable[ActionId].aMovement[j].aDuration=%d"), CGAsset[Ver].AnimeTable[ActionId].aMovement[j].aDuration);
+					UE_LOG(LogTemp, Warning, TEXT("CGAsset[Ver].AnimeTable[ActionId].aMovement[j].aFrameNum=%d"), CGAsset[Ver].AnimeTable[ActionId].aMovement[j].aFrameNum);
 
 					CGAsset[Ver].AnimeTable[ActionId].aMovement[j].gId = new uint32[CGAsset[Ver].AnimeTable[ActionId].aMovement[j].aFrameNum];
 
 					for (uint32 k = 0; k < CGAsset[Ver].AnimeTable[ActionId].aMovement[j].aFrameNum; k++)//k: frame num
 					{
-						AnimeFrame FrameData;
-						
 						// Load Anime_*.bin FrameData
-						uint32 DataSize = CGAsset[Ver].AnimeTable[ActionId].aMovement[j].aFrameNum * sizeof(AnimeFrame);
-						fileHandleTmp2->Read((uint8 *)&FrameData, DataSize);
-
-						CGAsset[Ver].AnimeTable[ActionId].aMovement[j].gId[k] = FrameData.gId;
+						fileHandleTmp2->Seek(pAnimeInfo[i].aAddr + j * 12 + k * 10);
+						fileHandleTmp2->Read((uint8 *)&CGAsset[Ver].AnimeTable[ActionId].aMovement[j].gId[k], 4);
 					}
 				}
 			}
@@ -695,5 +703,4 @@ void FCGGraphicDecoder::Test()
 //    }
     
     //CreateTileMap(1000);
-    
 }
