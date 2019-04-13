@@ -194,7 +194,8 @@ public:
 	enum AssetVer
 	{
 		V_0,
-		V_Ex
+		V_Ex,
+        V_unknown
 	};
 
 private:
@@ -209,17 +210,26 @@ private:
 
 	struct TileData
 	{
-		uint32 gId;//GraphicInfo.gId
+        AssetVer Ver;
+        uint32 gId;
+        uint8 bIsTile;//isTile=1 : 64*47
 		uint32 TileSetId;//tileset file id
 		uint32 TileSetIndex;//index in tileset
+        uint32 CountTerrain;
+        uint32 CountArtifact;
+        uint32 bHasTileId;
+        TSet<uint32> Map;
 	};
+    
+    TMap<uint32, TileData> TileInfo;//gTileId
 
 	struct AssetInfo
 	{
 		TMap<AssetType, FString> Path;
 		GraphicInfo * GraphicInfo;
+        uint32 GraphicNum;
 		AnimeTable * AnimeTable;
-		TMap<uint32, TileData> TileInfo;
+        uint32 AnimeNum;
 		IFileHandle * FileHandle;
 	};
 	
@@ -242,9 +252,7 @@ public:
     
 	UTexture2D * GetTexture2D(uint32 GraphicId, FString PaletType, AssetVer Ver);
 	void SaveToPng(uint32 GraphicId, FString PaletType, AssetVer Ver);
-	void SaveTileToPng(uint32 GraphicId, FString PaletType, AssetVer Ver);
-    
-    void CreateTileMap(uint32 MapId);
+	void ExportTileMapPng();
     
     void Test();
     
@@ -260,11 +268,17 @@ private:
 	// set map/*.dat to CurMap
 	void SetMapData(uint32 MapId);
     
+    // create tilemap assets
+    void CreateTileMap(uint32 MapId);
+    
     // load bin/AnimeInfo*.bin Anime*.bin
 	void LoadAnimeTable(AssetVer Ver);
 
     // load bin/Graphic*_Info.bin
     void LoadGraphicInfo(AssetVer Ver);
+    
+    // set TMap<uint32, TileData> TileInfo
+    void SetTileInfo(AssetVer Ver);
 
     // load bin/pal/palet_*.cgp to TMap<FString, Palet> CGPalet
     void LoadPaletData();
