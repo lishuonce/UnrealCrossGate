@@ -100,19 +100,19 @@ private:
          */
         uint8 mHeader[3];
 		uint8 mBlank[9];
-		uint32 mWeight;
+		uint32 mWidth;
 		uint32 mHeight;
         /* mTerrainLayer
-         * bytesize = mWeight * mHeight *2
-         * length = mWeight * mHeight
+         * bytesize = mWidth * mHeight *2
+         * length = mWidth * mHeight
          * enum :
          * GraphicInfo.gTileId=TileId
          * 0x00=NoTile
          */
 		uint16 *mTerrainLayer;
         /* mArtifactLayer
-         * bytesize = mWeight * mHeight *2
-         * length = mWeight * mHeight
+         * bytesize = mWidth * mHeight *2
+         * length = mWidth * mHeight
          * enum :
          * GraphicInfo.gTileId=TileId
          * 0x00=NoTile
@@ -120,8 +120,8 @@ private:
          */
 		uint16 *mArtifactLayer;
         /* mFlagLayer
-         * bytesize = mWeight * mHeight *2
-         * length = mWeight * mHeight
+         * bytesize = mWidth * mHeight *2
+         * length = mWidth * mHeight
          * enum - MapFlag.fTransit :
          * 0x0A=MapTransit
          * 0x00=NoTransit

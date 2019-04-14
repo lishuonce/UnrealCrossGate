@@ -104,38 +104,35 @@ void FCGGraphicDecoder::ExportTileMapPng()
 {
     for (auto& TileElem :TileInfo)
     {
-        if (TileElem.Value.CountTerrain > 0)
-        {
-            // decode Graphic
-            SetColorBuff(TileElem.Value.gId, "00", TileElem.Value.Ver);
-            
-            // create png array
-            TArray<FColor> SrcData;
-            SrcData.Append(ColorBuff, CurGraphicData.gLength);
-            TArray<uint8> DstData;
-            FImageUtils::CompressImageArray(CurGraphicData.gWidth, CurGraphicData.gHeight, SrcData, DstData);
-            
-            FString fsTexturePath = FPaths::ProjectContentDir() + "CGRawDecode/Map/NonTiles/";
-            if (TileElem.Value.bIsTile)
-            {
-                fsTexturePath = FPaths::ProjectContentDir() + "CGRawDecode/Map/Tiles/";
-            }
-            
-            FString fsTmpPngPath = fsTexturePath + FString::FromInt(TileElem.Key) + ".png";// Filename : gTileId
-            
-            // save png file
-            IPlatformFile &platFormFile = FPlatformFileManager::Get().GetPlatformFile();
-            IFileHandle *fileHandleTmp = platFormFile.OpenWrite(*fsTmpPngPath);
-            if (fileHandleTmp)
-            {
-                fileHandleTmp->Write(DstData.GetData(), DstData.Num());
-                delete fileHandleTmp;
-            }
-            
-            // gc ColorBuff
-            delete[] ColorBuff;
-            ColorBuff = nullptr;
-        }
+		// decode Graphic
+		SetColorBuff(TileElem.Value.gId, "00", TileElem.Value.Ver);
+
+		// create png array
+		TArray<FColor> SrcData;
+		SrcData.Append(ColorBuff, CurGraphicData.gLength);
+		TArray<uint8> DstData;
+		FImageUtils::CompressImageArray(CurGraphicData.gWidth, CurGraphicData.gHeight, SrcData, DstData);
+
+		FString fsTexturePath = FPaths::ProjectContentDir() + "CGRawDecode/Map/NonTiles/";
+		if (TileElem.Value.bIsTile)
+		{
+			fsTexturePath = FPaths::ProjectContentDir() + "CGRawDecode/Map/Tiles/";
+		}
+
+		FString fsTmpPngPath = fsTexturePath + FString::FromInt(TileElem.Key) + ".png";// Filename : gTileId
+
+		// save png file
+		IPlatformFile& platFormFile = FPlatformFileManager::Get().GetPlatformFile();
+		IFileHandle* fileHandleTmp = platFormFile.OpenWrite(*fsTmpPngPath);
+		if (fileHandleTmp)
+		{
+			fileHandleTmp->Write(DstData.GetData(), DstData.Num());
+			delete fileHandleTmp;
+		}
+
+		// gc ColorBuff
+		delete[] ColorBuff;
+		ColorBuff = nullptr;
     }
 }
 
@@ -211,10 +208,10 @@ void FCGGraphicDecoder::SetMapData(uint32 MapId)
 	IFileHandle *fileHandleTmp = PlatFormFile.OpenRead(*fsMapFile);
 	if (fileHandleTmp)
 	{
-		// Load GraphicMap Header : mHeader[3], mBlank[9], mWeight, mHeight
+		// Load GraphicMap Header : mHeader[3], mBlank[9], mWidth, mHeight
 		fileHandleTmp->Read((uint8 *)&CurMap, 20);
 
-		uint32 LayerLength = CurMap.mWeight * CurMap.mHeight;
+		uint32 LayerLength = CurMap.mWidth * CurMap.mHeight;
         uint32 LayerSize = LayerLength * 2;
 
 		// Load GraphicMap Layet : mTerrainLayer
@@ -236,12 +233,13 @@ void FCGGraphicDecoder::SetMapData(uint32 MapId)
 void FCGGraphicDecoder::CreateTileMap(uint32 MapId)
 {
     // load tilesets
-    FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
-    TArray<FAssetData> AssetData;
-    FARFilter Filter;
-    Filter.ClassNames.Add(UPaperTileSet::StaticClass()->GetFName());
-    Filter.PackagePaths.Add("/Game/Maps/TileSets");
-    AssetRegistryModule.Get().GetAssets(Filter, AssetData);
+	TArray<UPaperTileSet*> TileSets;
+	FString fsTileSetPrefix = "/Game/Maps/TileSets/Tiles";
+	for (uint8 i = 0; i <= 5; i++)
+	{
+		FString fsTileSetName = fsTileSetPrefix + FString::FromInt(i);
+		TileSets.Emplace(LoadObject<UPaperTileSet>(NULL, *fsTileSetName));
+	}
     
     // create package
     FString PackageName = FString::FromInt(MapId);
@@ -252,8 +250,8 @@ void FCGGraphicDecoder::CreateTileMap(uint32 MapId)
     
     // set map data - base
     SetMapData(MapId);
-    TileMap->MapWidth = CurMap.mWeight;
-    TileMap->MapHeight = CurMap.mHeight;
+    TileMap->MapWidth = CurMap.mHeight;
+    TileMap->MapHeight = CurMap.mWidth;
     TileMap->TileWidth = 64;
     TileMap->TileHeight = 47;
     TileMap->ProjectionMode = ETileMapProjectionMode::IsometricDiamond;
@@ -263,10 +261,31 @@ void FCGGraphicDecoder::CreateTileMap(uint32 MapId)
     UPaperTileLayer *pTerrainLayer = TileMap->AddNewLayer();
     pTerrainLayer->LayerName = FText::FromString(TEXT("Terrain"));
     
-    FPaperTileInfo fTileInfo;
-    fTileInfo.TileSet = (UPaperTileSet *)AssetData[0].GetAsset();
-    fTileInfo.PackedTileIndex = 55;
-    pTerrainLayer->SetCell(0, 0, fTileInfo);
+	uint32 LayerCursor = 0;
+	for (uint32 CurX = 0; CurX <= CurMap.mHeight - 1; CurX++)
+	{
+		for (int32 CurY = CurMap.mWidth - 1; CurY >= 0; CurY--)
+		{
+			uint32 CurTileId = CurMap.mTerrainLayer[LayerCursor];
+			LayerCursor++;
+			
+			if (CurTileId >= 20000)
+			{
+				CurTileId += 200000;
+			}
+
+			if (CurTileId != 0 && TileInfo.Contains(CurTileId))
+			{
+				FPaperTileInfo fCellInfo;
+				uint32 TileSetId = TileInfo[CurTileId].TileSetId;
+				fCellInfo.TileSet = TileSets[TileSetId];
+				fCellInfo.PackedTileIndex = TileInfo[CurTileId].TileSetIndex;
+				pTerrainLayer->SetCell(CurX, CurY, fCellInfo);
+
+				//UE_LOG(LogTemp, Warning, TEXT("%d,%d,%d,%d,%d,%d"), CurX, CurY, LayerCursor, CurTileId, TileSetId, TileInfo[CurTileId].TileSetIndex);
+			}
+		}
+	}
     
     // save package
     Package->MarkPackageDirty();
@@ -294,8 +313,24 @@ void FCGGraphicDecoder::LoadAnimeTable(AssetVer Ver)
 		if (fileHandleTmp2)
 		{
 			uint32 StartIndex = 2375;
-			CGAsset[Ver].AnimeTable = new AnimeTable[iRecordNum - StartIndex];
-            CGAsset[Ver].AnimeNum = iRecordNum - StartIndex;
+			switch (Ver)
+			{
+			case FCGGraphicDecoder::V_0:
+				StartIndex = 2375;
+				break;
+			case FCGGraphicDecoder::V_Ex:
+				StartIndex = 0;
+				break;
+			case FCGGraphicDecoder::V_unknown:
+				UE_LOG(CGGraphicDecoder, Error, TEXT("FCGGraphicDecoder::LoadAnimeTable switch (Ver) V_unknown"));
+				break;
+			default:
+				UE_LOG(CGGraphicDecoder, Error, TEXT("FCGGraphicDecoder::LoadAnimeTable switch (Ver) default"));
+				break;
+			}
+			CGAsset[Ver].AnimeNum = iRecordNum - StartIndex;
+			CGAsset[Ver].AnimeTable = new AnimeTable[CGAsset[Ver].AnimeNum];
+            
 
 			for (uint32 i = StartIndex; i < iRecordNum; i++)
 			{
@@ -352,37 +387,20 @@ void FCGGraphicDecoder::SetTileInfo(AssetVer Ver)
     {
         if (CGAsset[Ver].GraphicInfo[i].gTileId != 0)
         {
-            TileData TileData = { Ver, i, 0, 0, 0, 0, 0, 1 };
+            TileData TileData = { Ver, CGAsset[Ver].GraphicInfo[i].gId, 0, 0, 0, 0, 0, 1 };
             TileInfo.Emplace(CGAsset[Ver].GraphicInfo[i].gTileId, TileData);
         }
     }
     
     
     if (Ver == V_Ex)
-    {
-        // Set bIsTile, TileSetId, TileSetIndex
-        uint32 TileSetCount = 1376;//tile num per tileset
-        uint32 IsTiledIndex = 0;
-        
-        TileInfo.KeySort([](uint32 A, uint32 B) {return A < B;});
-        
-        for (auto& TileUnit :TileInfo)
-        {
-            if (CGAsset[TileUnit.Value.Ver].GraphicInfo[TileUnit.Value.gId].gWidth == 64 && CGAsset[TileUnit.Value.Ver].GraphicInfo[TileUnit.Value.gId].gHeight == 47)
-            {
-                TileUnit.Value.bIsTile = 1;
-                TileUnit.Value.TileSetId = FMath::DivideAndRoundDown(IsTiledIndex, TileSetCount);
-                TileUnit.Value.TileSetIndex = IsTiledIndex % TileSetCount;
-                IsTiledIndex++;
-            }
-        }
-        
+    {   
         // set CountTerrain, CountArtifact, bHasTileId, Map
         TileData TileData = { V_unknown, 0, 0, 0, 0, 0, 0, 0 };
         for (auto &Key : MapList)
         {
             SetMapData(Key);
-            uint32 Length = CurMap.mWeight * CurMap.mHeight;
+            uint32 Length = CurMap.mWidth * CurMap.mHeight;
             for (uint32 i = 0; i < Length; i++)
             {
                 uint32 TileId = CurMap.mTerrainLayer[i];
@@ -408,7 +426,7 @@ void FCGGraphicDecoder::SetTileInfo(AssetVer Ver)
                 }
                 if (TileInfo.Contains(TileId2))
                 {
-                    TileInfo[TileId2].CountTerrain++;
+                    TileInfo[TileId2].CountArtifact++;
                     TileInfo[TileId2].Map.Add(Key);
                 }
                 else if (TileId2 != 0 && TileId2 != 2)
@@ -433,6 +451,37 @@ void FCGGraphicDecoder::SetTileInfo(AssetVer Ver)
             }
             UE_LOG(LogTemp, Warning, TEXT("%d,%d,%d,%d,%d,%d,%d,%d,%d,%s"), TileUnit.Key, TileUnit.Value.Ver, TileUnit.Value.gId, TileUnit.Value.bIsTile, TileUnit.Value.TileSetId, TileUnit.Value.TileSetIndex, TileUnit.Value.bHasTileId, TileUnit.Value.CountTerrain, TileUnit.Value.CountArtifact, *mapSet);
         }*/
+
+		// remove unused tileinfo
+		TArray<uint32> TileInfoKeyArr;
+		TileInfo.GenerateKeyArray(TileInfoKeyArr);
+		for (auto& Elem : TileInfoKeyArr)
+		{
+			if (TileInfo[Elem].Ver == V_unknown
+				|| TileInfo[Elem].bHasTileId == 0
+				|| (TileInfo[Elem].CountTerrain == 0 && TileInfo[Elem].CountArtifact == 0)
+				|| (Elem <= 265 && Elem >= 200))
+			{
+				TileInfo.Remove(Elem);
+			}
+		}
+
+		// Set bIsTile, TileSetId, TileSetIndex
+		const uint32 TileSetCount = 1376;//tile num per tileset
+		uint32 IsTiledIndex = 0;
+
+		TileInfo.KeySort([](uint32 A, uint32 B) {return A < B; });
+
+		for (auto& TileElem : TileInfo)
+		{
+			if (CGAsset[TileElem.Value.Ver].GraphicInfo[TileElem.Value.gId].gWidth == 64 && CGAsset[TileElem.Value.Ver].GraphicInfo[TileElem.Value.gId].gHeight == 47)
+			{
+				TileElem.Value.bIsTile = 1;
+				TileElem.Value.TileSetId = FMath::DivideAndRoundDown(IsTiledIndex, TileSetCount);
+				TileElem.Value.TileSetIndex = IsTiledIndex % TileSetCount;
+				IsTiledIndex++;
+			}
+		}
     }
 }
 
@@ -693,7 +742,7 @@ void FCGGraphicDecoder::Test()
 //    for (auto &Key : MapList)
 //    {
 //        SetMapData(Key);
-//        uint32 Length = CurMap.mWeight * CurMap.mHeight;
+//        uint32 Length = CurMap.mWidth * CurMap.mHeight;
 //        uint32 counttransit = 0;
 //        uint32 countnotransit = 0;
 //        uint32 countpass = 0;
@@ -741,6 +790,6 @@ void FCGGraphicDecoder::Test()
 //        delete[] CurMap.mFlagLayer;
 //    }
     
-    ExportTileMapPng();
-    //CreateTileMap(1000);
+    //ExportTileMapPng();
+    CreateTileMap(2000);
 }
