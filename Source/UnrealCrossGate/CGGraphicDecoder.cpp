@@ -791,5 +791,5 @@ void FCGGraphicDecoder::Test()
 //    }
     
     //ExportTileMapPng();
-    CreateTileMap(2000);
+    //CreateTileMap(2000);
 }

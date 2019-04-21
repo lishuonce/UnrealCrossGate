@@ -3,23 +3,68 @@
 #include "CGWorldGM.h"
 #include "CGPlayerController.h"
 #include "CGGraphicDecoder.h"
+#include "PaperTileMap.h"
+#include "PaperTileMapActor.h"
+#include "PaperTileMapComponent.h"
 #include "PaperSprite.h"
-#include "PaperSpriteComponent.h"
 #include "PaperSpriteActor.h"
-#include "ConstructorHelpers.h"
+#include "PaperSpriteComponent.h"
 
 DEFINE_LOG_CATEGORY_STATIC(CGWorldGM, Log, All);
 
 ACGWorldGM::ACGWorldGM()
 {
-    PlayerControllerClass = ACGPlayerController::StaticClass();
+    //PlayerControllerClass = ACGPlayerController::StaticClass();
 }
 
 void ACGWorldGM::BeginPlay()
 {
     Super::BeginPlay();
     
-    FCGGraphicDecoder &CGGraphicDecoderSingle = FCGGraphicDecoder::Get();
+    //FCGGraphicDecoder &CGGraphicDecoderSingle = FCGGraphicDecoder::Get();
+
+	UWorld* const World = GetWorld();
+	if (World) {
+
+		APaperTileMapActor *tmActor = World->SpawnActor<APaperTileMapActor>();
+		UPaperTileMapComponent *tmComponent = tmActor->GetRenderComponent();
+
+		UPaperTileMap* tmObject = NewObject<UPaperTileMap>();
+		tmObject->MapWidth = 3;
+		tmObject->MapHeight = 4;
+		tmObject->TileWidth = 64;
+		tmObject->TileHeight = 47;
+		tmObject->ProjectionMode = ETileMapProjectionMode::IsometricDiamond;
+		tmObject->InitializeNewEmptyTileMap();
+
+		//tmComponent->SetMobility(EComponentMobility::Stationary);
+		tmComponent->SetTileMap(tmObject);
+
+		FVector TileVector;
+		uint32 X, Y;
+
+		X = 0;
+		Y = 0;
+		TileVector = tmComponent->GetTileCornerPosition(X, Y);
+		UE_LOG(LogTemp, Warning, TEXT("L:X=%d,Y=%d topleft x:%f,y:%f,z:%f"), X, Y, TileVector.X, TileVector.Y, TileVector.Z);
+
+		TileVector = tmComponent->GetTileCenterPosition(X, Y);
+		UE_LOG(LogTemp, Warning, TEXT("L:X=%d,Y=%d center x:%f,y:%f,z:%f"), X, Y, TileVector.X, TileVector.Y, TileVector.Z);
+
+		X = 0;
+		Y = 1;
+		TileVector = tmComponent->GetTileCornerPosition(X, Y, 0, true);
+		UE_LOG(LogTemp, Warning, TEXT("W:X=%d,Y=%d corner x:%f,y:%f,z:%f"), X, Y, TileVector.X, TileVector.Y, TileVector.Z);
+
+		TileVector = tmComponent->GetTileCenterPosition(X, Y, 0, true);
+		UE_LOG(LogTemp, Warning, TEXT("W:X=%d,Y=%d center x:%f,y:%f,z:%f"), X, Y, TileVector.X, TileVector.Y, TileVector.Z);
+
+		UPaperSprite* Sprite = LoadObject<UPaperSprite>(NULL, TEXT("PaperSprite'/Game/Textures/Map/Frames/221247_2.221247_2'"));
+		APaperSpriteActor* SpriteActor = World->SpawnActor<APaperSpriteActor>();
+		UPaperSpriteComponent* SpriteComponent = SpriteActor->GetRenderComponent();
+		SpriteComponent->SetMobility(EComponentMobility::Stationary);
+		SpriteComponent->SetSprite(Sprite);
+	}
     
 	/*for (uint32 i = 0; i <= 7425; i++) {
         CGGraphicDecoderSingle.SaveToPng(i, "00");
@@ -37,25 +82,5 @@ void ACGWorldGM::BeginPlay()
     for (auto Key = PaletMapKey.CreateConstIterator(); Key; ++Key)
     {
         CGGraphicDecoderSingle.GetDecodePngData(19713, *Key);
-    }*/
-
-    /*UWorld* const World = GetWorld();
-    if (World) {
-
-        //UPaperSprite *MapSprite = LoadObject<UPaperSprite>(NULL, TEXT("/Game/Textures/MapTiles/19713_00_Sprite"));
-        UPaperSprite *MapSprite = NewObject<UPaperSprite>();
-
-        UTexture2D *MapTex2d = CGGraphicDecoderSingle.GetTexture2D(19713, "00");
-		MapTex2d->Source.Init(MapTex2d->GetSizeX(), MapTex2d->GetSizeY(), 0, 0, ETextureSourceFormat::TSF_Invalid);
-
-        FSpriteAssetInitParameters Para;
-        Para.SetTextureAndFill(MapTex2d);
-        MapSprite->InitializeSprite(Para);
-
-        APaperSpriteActor *MapSpriteActor = World->SpawnActor<APaperSpriteActor>();
-        UPaperSpriteComponent *RenderComponent = MapSpriteActor->GetRenderComponent();
-
-        RenderComponent->SetMobility(EComponentMobility::Stationary);
-        RenderComponent->SetSprite(MapSprite);
     }*/
 }
